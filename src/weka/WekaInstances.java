@@ -200,7 +200,7 @@ public class WekaInstances extends Instances {
 	
 	/**
 	 * Set the value of the temporary instance workingInstance. This is for string
-	 * attributes only. Wil
+	 * attributes only.
 	 * @param attributeName : Name of the attribute to for which value is to be set
 	 * @param value : the double value to be set
 	 * @param createAttribute: If the attribute is not present in the instances then

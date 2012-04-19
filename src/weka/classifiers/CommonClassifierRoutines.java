@@ -163,7 +163,7 @@ public final class CommonClassifierRoutines {
 		return result;
 	}
 	
-	public static void leaveOneOutCorss(AbstractClassifier classifier ,
+	public static void leaveOneOutCrossValidation(AbstractClassifier classifier ,
 			Instances instances, int[] indicesTORemove, int [] indicesToPrint,
 			String[] options, String dumpfile) throws Exception {
 		Instances copied = instances;

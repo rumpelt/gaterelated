@@ -14,9 +14,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.Vector;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.FieldSelector;
 import org.apache.lucene.index.CorruptIndexException;
@@ -38,7 +45,14 @@ import tokenizers.LucenePTBTokenizer;
 import tokenizers.NgramTokenizer;
 import tokenizers.StopWordList;
 import weka.WekaInstances;
+import weka.classifiers.AbstractClassifier;
+import weka.classifiers.ClassifierType;
+import weka.classifiers.CommonClassifierRoutines;
+import weka.classifiers.Evaluation;
+import weka.classifiers.J48Classifier;
+import weka.classifiers.functions.SimpleLogistic;
 import weka.core.Attribute;
+import weka.core.Instances;
 
 /**
  * a set of very specific routines for my work on medical data.
@@ -46,7 +60,384 @@ import weka.core.Attribute;
  *
  */
 public class MedicalTrainer {
+	private static Options options = new Options();
+	
+	private static void addOptions() {
+		options.addOption("eval", "eval", false, "Are we doing just evaluatin? Using the weka" +
+				"api Evalatuation, by default it  is set to false");
+		options.addOption("dumparff", "dumparff", true, "dump the training set arff, this is" +
+				"for debugging purpose");
+		options.addOption("predict", "predict", false, "run the classifer built to predict and dump");
+		options.addOption("cltype", "classifierType", true, "the type of weka classifier to use");
+		options.addOption("ifile", "inputfile", true, "the csv file to  be oprated on");
+		options.addOption("dfile", "dumpfile", true, "the csv file to which we will dump the output" +
+				"of the prediction");
+		options.addOption("st", "stem", true, "do we want to stem. defaults to true");
+		options.addOption("lc", "lowercase", true, "do we want to lowercase, defualts to" +
+				"true");
+		options.addOption("stopword", "stopword", true, "do we want to use the stop words, " +
+		"defaults to StopWordList.medicalWords");
+		options.addOption("tcol", "textcol", true, "text column number");
+		options.addOption("lcol", "labelcol", true, "label col number");
+		options.addOption("agecol", "agecol", true, "age column number");
+		options.addOption("lage", "lowage", true, "the low age value");
+		options.addOption("uage", "upage", true, "the up age value");
+		options.addOption("idcol", "idcol", true, "identifier column number");
+		options.addOption("idname", "idname", true, "nameOfIdentifier");
+		options.addOption("lclass", "labelclass", true, "List of Labels of the class, " +
+				"currently defaults to FeedCategories");
+		options.addOption("ngrams", "ngrams", true, "the ngrams to operate upon, the listofngrams" +
+				"is separated by semicolon :");
+		options.addOption("rmsinglecount","removesinglecount", true, "remove singlecount terms");
+		options.addOption("dumpindex","indexestodump", true, "indexes which needs to be dumped" +
+				"for pretty output. bydefault set to {0,1}. " +
+				"Just to avoid making command line argument big");
+		options.addOption("rmindex","removeindexes", true, "indexes which needs to be removed" +
+				"before building the classifer. bydefault set to {0,1}. " +
+				"os as to avoid making command line argument big");
+	}
+	
+	public void launchPad() throws Exception {
+		Counter<String> termspace = this.returnFreqDistOnSetOfNgrams();
+		this.trainingSet = this.returnIndicatorVectorOfTermSpace(termspace.keySet(),
+				true);
+		
+		if (this.predict) {
+			this.classifier = CommonClassifierRoutines.trainOnInstances(classifier, 
+					this.trainingSet, this.indicesToRemove,this.classifieroptions );
+			WekaInstances testingSet= this.returnIndicatorVectorOfTermSpace(termspace.keySet(),
+					false);
+			testingSet.setClassMissingForEachInstance();
+		}
+		else if (this.eval)
+			this.evaluate();
+		else {
+			CommonClassifierRoutines.leaveOneOutCrossValidation(this.classifier, this.trainingSet, 
+					this.indicesToRemove, this.indicesTodump, this.classifieroptions
+					, this.dumpfile);
+		}
+			
+	}
+	public static MedicalTrainer  parserArgument(String[] commandargs) throws Exception {
+		MedicalTrainer.addOptions();
+		MedicalTrainer mt = new MedicalTrainer();
+		CommandLineParser cmdLineGnuParser = new GnuParser();
+		CommandLine command = cmdLineGnuParser.parse(options, commandargs);
+		if (command.hasOption("predict")) {
+			 mt.predict = true;
+		}
+		if (command.hasOption("eval")) {
+			mt.setEval(true);
+		}
+		if (command.hasOption("cltype")) {
+			mt.initClassifier(ClassifierType.valueOf(command.getOptionValue("cltype")),
+					null);
+		}
+		if (command.hasOption("ifile")) {
+			mt.setFilename(command.getOptionValue("ifile"));
+		}
+		if (command.hasOption("ifile")) {
+			mt.setFilename(command.getOptionValue("ifile"));
+		}
+		
+		if (command.hasOption("st")) {
+			mt.setStem(new Boolean(command.getOptionValue("st")));
+		}
+		
+		if (command.hasOption("lc")) {
+			mt.setLowercase(new Boolean(command.getOptionValue("lc")));
+		}
+		if (command.hasOption("stopword")) {
+			throw new UnsupportedOperationException("Havn't yet implemented " +
+					"the command line parsing for stop words");
+		}
+		
+		if (command.hasOption("tcol")) {
+			mt.setTextcol(Integer.parseInt(command.getOptionValue("tcol")));
+		}
+		
+		if (command.hasOption("lcol")) {
+			mt.setLabelcol(Integer.parseInt(command.getOptionValue("lcol")));
+		}
+		
+		if (command.hasOption("agecol")) {
+			mt.setAgecol(Integer.parseInt(command.getOptionValue("agecol")));
+		}
+		
+		if (command.hasOption("lage")) {
+			mt.setLowageval(Float.parseFloat(command.getOptionValue("lage")));
+		}
+		
+		if (command.hasOption("uage")) {
+			mt.setUpageval(Float.parseFloat(command.getOptionValue("uage")));
+		}
+		
+		if (command.hasOption("idcol")) {
+			mt.setIdentifierCol(Integer.parseInt(command.getOptionValue("idcol")));
+		}
+		
+		if (command.hasOption("idname")) {
+			mt.setIdentifierName(command.getOptionValue("uage"));
+		}
+		if (command.hasOption("ngrams")) {
+			String ngrams = command.getOptionValue("ngrams");
+			StringTokenizer st = new StringTokenizer(ngrams,":");
+			List<Integer> ngramsToGet = new ArrayList<Integer>();
+			while (st.hasMoreTokens()) {
+				ngramsToGet.add(Integer.parseInt(st.nextToken()));
+			}
+			mt.setNgramsToGet(ngramsToGet);
+		}
+		
+		if (command.hasOption("lclass")) {
+			throw new UnsupportedOperationException("Havn't yet implemented " +
+					"the command line parsing for this label classes");
+		}
+		return mt;
+	}
+	
+	public void initClassifier(ClassifierType ctype, String[] options) 
+	throws Exception {
+		if (ctype.equals(ClassifierType.J48)) {
+			this.classifier = new J48Classifier();
+			this.classifier.setOptions(options);
+		}
+		else if (ctype.equals(ClassifierType.simplelogistic)) {
+			this.classifier = new SimpleLogistic();
+			this.classifier.setOptions(options);
+		}
+	}
+	private String dumpfile = null;
+	private String[] classifieroptions =null;
+	private boolean predict = false;
+	private WekaInstances trainingSet = null;
+	private boolean eval = false;
+	/**
+	 * @return the eval
+	 */
+	public boolean isEval() {
+		return eval;
+	}
+
+	/**
+	 * @param eval the eval to set
+	 */
+	public void setEval(boolean eval) {
+		this.eval = eval;
+	}
+	private AbstractClassifier classifier=null;
     private String identifierName;
+	/**
+	 * @return the identifierName
+	 */
+	public String getIdentifierName() {
+		return identifierName;
+	}
+
+	/**
+	 * @param identifierName the identifierName to set
+	 */
+	public void setIdentifierName(String identifierName) {
+		this.identifierName = identifierName;
+	}
+
+	/**
+	 * @return the textcol
+	 */
+	public int getTextcol() {
+		return textcol;
+	}
+
+	/**
+	 * @param textcol the textcol to set
+	 */
+	public void setTextcol(int textcol) {
+		this.textcol = textcol;
+	}
+
+	/**
+	 * @return the identifierCol
+	 */
+	public int getIdentifierCol() {
+		return identifierCol;
+	}
+
+	/**
+	 * @param identifierCol the identifierCol to set
+	 */
+	public void setIdentifierCol(int identifierCol) {
+		this.identifierCol = identifierCol;
+	}
+
+	/**
+	 * @return the agecol
+	 */
+	public int getAgecol() {
+		return agecol;
+	}
+
+	/**
+	 * @param agecol the agecol to set
+	 */
+	public void setAgecol(int agecol) {
+		this.agecol = agecol;
+	}
+
+	/**
+	 * @return the labelcol
+	 */
+	public int getLabelcol() {
+		return labelcol;
+	}
+
+	/**
+	 * @param labelcol the labelcol to set
+	 */
+	public void setLabelcol(int labelcol) {
+		this.labelcol = labelcol;
+	}
+
+	/**
+	 * @return the lowageval
+	 */
+	public float getLowageval() {
+		return lowageval;
+	}
+
+	/**
+	 * @param lowageval the lowageval to set
+	 */
+	public void setLowageval(float lowageval) {
+		this.lowageval = lowageval;
+	}
+
+	/**
+	 * @return the upageval
+	 */
+	public float getUpageval() {
+		return upageval;
+	}
+
+	/**
+	 * @param upageval the upageval to set
+	 */
+	public void setUpageval(float upageval) {
+		this.upageval = upageval;
+	}
+
+	/**
+	 * @return the ngramsToGet
+	 */
+	public List<Integer> getNgramsToGet() {
+		return ngramsToGet;
+	}
+
+	/**
+	 * @param ngramsToGet the ngramsToGet to set
+	 */
+	public void setNgramsToGet(List<Integer> ngramsToGet) {
+		this.ngramsToGet = ngramsToGet;
+	}
+
+	/**
+	 * @return the stopwordlist
+	 */
+	public Set<?> getStopwordlist() {
+		return stopwordlist;
+	}
+
+	/**
+	 * @param stopwordlist the stopwordlist to set
+	 */
+	public void setStopwordlist(Set<?> stopwordlist) {
+		this.stopwordlist = stopwordlist;
+	}
+
+	/**
+	 * @return the stem
+	 */
+	public boolean isStem() {
+		return stem;
+	}
+
+	/**
+	 * @param stem the stem to set
+	 */
+	public void setStem(boolean stem) {
+		this.stem = stem;
+	}
+
+	/**
+	 * @return the lowercase
+	 */
+	public boolean isLowercase() {
+		return lowercase;
+	}
+
+	/**
+	 * @param lowercase the lowercase to set
+	 */
+	public void setLowercase(boolean lowercase) {
+		this.lowercase = lowercase;
+	}
+
+	/**
+	 * @return the filename
+	 */
+	public String getFilename() {
+		return filename;
+	}
+
+	/**
+	 * @param filename the filename to set
+	 */
+	public void setFilename(String filename) {
+		this.filename = filename;
+	}
+
+	/**
+	 * @return the classvalues
+	 */
+	public List<String> getClassvalues() {
+		return classvalues;
+	}
+
+	/**
+	 * @param classvalues the classvalues to set
+	 */
+	public void setClassvalues(List<String> classvalues) {
+		this.classvalues = classvalues;
+	}
+
+	/**
+	 * @return the datasetname
+	 */
+	public String getDatasetname() {
+		return datasetname;
+	}
+
+	/**
+	 * @param datasetname the datasetname to set
+	 */
+	public void setDatasetname(String datasetname) {
+		this.datasetname = datasetname;
+	}
+
+	/**
+	 * @return the skipHeader
+	 */
+	public boolean isSkipHeader() {
+		return skipHeader;
+	}
+
+	/**
+	 * @param skipHeader the skipHeader to set
+	 */
+	public void setSkipHeader(boolean skipHeader) {
+		this.skipHeader = skipHeader;
+	}
+	private int[] indicesTodump = {0,1};
+	private int[] indicesToRemove = {0,1};
 	private int textcol;
 	private int identifierCol;
 	private int agecol;
@@ -54,10 +445,9 @@ public class MedicalTrainer {
 	private float lowageval;
 	private float upageval;
 	private List<Integer> ngramsToGet;
-	private Set<?> stopwordlist = StopWordList.getMedicalStopWordList(Version.LUCENE_35) ;
+	private Set<?> stopwordlist = null;
 	private boolean stem;
 	private boolean lowercase;
-	private boolean removestopword;
 	private String filename;
 	List<String> classvalues;
 	private String datasetname;
@@ -65,6 +455,10 @@ public class MedicalTrainer {
 	public MedicalTrainer() {
 		this.classvalues = FeedCategories.returnAllValues();
 		stopwordlist = StopWordList.getMedicalStopWordList(Version.LUCENE_35) ;
+		this.lowercase = true;
+		this.stem = true;
+		this.skipHeader = true;
+		this.datasetname = "medicalTrainer";
 	}
 	
 	/**
@@ -155,8 +549,7 @@ public class MedicalTrainer {
 			}
 		//	System.out.println(nextLine[identifierCol-1]+" "+ age);
 			for (int ngram : this.ngramsToGet) {
-				Set<String> terms = MedicalTrainer.returnUniqueNgramTermspace(text, ngram, 
-						this.lowercase,this.stem, this.stopwordlist);
+				Set<String> terms = this.returnUniqueNgramTermspace(text, ngram);
 				if (termspace != null) {
 					for (String t : terms)	{
 						if (termspace.contains(t))
@@ -362,12 +755,11 @@ public class MedicalTrainer {
 		return cntr;
 	}
 	
-	public  Counter<String> returnFreqDistOnSetOfNgrams(String filename ,
-			int textcol,int agecol,float lowvalue, float upvalue, List<Integer> ngramsToget,
-			boolean tolowercase, boolean stem, Set<?> stopwordlist, boolean skipHeader	) throws NumberFormatException, IOException {
+	public  Counter<String> returnFreqDistOnSetOfNgrams() throws NumberFormatException, IOException 
+	 {
 		Counter<String> result = new IntCounter<String>();
-		for (int ngram : ngramsToget) {
-			result.addAll(MedicalTrainer.returnFreqDist(ngram));
+		for (int ngram : this.ngramsToGet) {
+			result.addAll(this.returnFreqDist(ngram));
 		}
 		return result;
 	}
@@ -386,7 +778,8 @@ public class MedicalTrainer {
 	 * @throws NumberFormatException
 	 * @throws IOException
 	 */
-	public  Counter<String> returnFreqDist( int ngramsToget)	throws NumberFormatException, IOException {
+	public  Counter<String> returnFreqDist( int ngramsToget)	
+		throws NumberFormatException, IOException {
 		
 		Counter<String> cntr = new IntCounter<String>();
 		CSVReader csvreader = new CSVReader(new FileReader(this.filename));
@@ -429,7 +822,8 @@ public class MedicalTrainer {
 		return cntr;
 	}
 	
-	public WekaInstances returnRelativeProbabilityWeight(HashMap<Integer, Counter<String>> counters, boolean addunknownClass)
+	public WekaInstances returnRelativeProbabilityWeight(HashMap<Integer, 
+			Counter<String>> counters, boolean addunknownClass)
 	throws NumberFormatException, IOException {
 		
 		int numattributes = 0;
@@ -519,7 +913,7 @@ public class MedicalTrainer {
 			//	System.out.println(lclass);
 				wekainstances.setValueOfWorkingInstance("class", lclass);
 			}
-			if (!addunknownClass || this.lclass == null ) {
+			if (!addunknownClass || lclass == null ) {
 				wekainstances.delete(wekainstances.numInstances() -1 );
 			}
 		}
@@ -545,5 +939,17 @@ public class MedicalTrainer {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+		
 	}
+	
+	public void evaluate() throws Exception {
+		Instances instances = CommonClassifierRoutines.removeAttributes(
+				this.trainingSet,this.indicesToRemove);
+		Evaluation eval = new Evaluation(instances);
+		eval.crossValidateModel(this.classifier, instances, instances.numInstances(), 
+				new Random(1000));
+		System.out.println(eval.toSummaryString("\nResults\n======\n", false));
+	}
+	
 }
