@@ -8,6 +8,6 @@ package weka.classifiers;
  *
  */
 public enum ClassifierType {
-J48,
+j48,
 simplelogistic
 }

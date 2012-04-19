@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.TreeSet;
 
 import java.util.Set;
 
@@ -18,10 +17,8 @@ import java.util.Vector;
 
 
 
-import misc.FeedCategories;
-import misc.MedicalTrainer;
+import cchs.FeedCategories;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.lucene.document.FieldSelector;
@@ -35,12 +32,12 @@ import org.apache.lucene.document.Document;
 
 
 import specialstruct.MappedVector;
-import specialstruct.NamedVector;
+
 
 import weka.WekaInstances;
-import weka.WekaRoutines;
+
 import weka.classifiers.J48Classifier;
-import weka.core.Instances;
+
 import weka.core.Attribute;
 
 

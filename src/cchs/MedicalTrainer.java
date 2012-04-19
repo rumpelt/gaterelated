@@ -1,7 +1,7 @@
 /**
  * 
  */
-package misc;
+package cchs;
 
 import java.io.File;
 import java.io.FileNotFoundException;
