@@ -9,5 +9,7 @@ package weka.classifiers;
  */
 public enum ClassifierType {
 j48,
-simplelogistic
+simplelogistic,
+logistic,
+adaboost
 }

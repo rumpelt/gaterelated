@@ -40,25 +40,42 @@ import tokenizers.LucenePTBTokenizer;
 import tokenizers.NgramTokenizer;
 import tokenizers.StopWordList;
 import weka.WekaInstances;
+import weka.WekaRoutines;
 import weka.classifiers.AbstractClassifier;
 import weka.classifiers.ClassifierType;
 import weka.classifiers.CommonClassifierRoutines;
 import weka.classifiers.Evaluation;
 import weka.classifiers.J48Classifier;
+import weka.classifiers.functions.Logistic;
 import weka.classifiers.functions.SimpleLogistic;
+import weka.classifiers.meta.AdaBoostM1;
 import weka.core.Attribute;
 import weka.core.Instances;
 
 /**
  * a set of very specific routines for my work on medical data.
  * @author ashwani
+ * an example of the commandline argument to invoke this is as following
+ * --mt --ifile /home/ashwani/xyz/allfeedtype.csv --tcol 3 --agecol 2 --idcol 1 
+ * --lcol 7  --cltype=adaboost    --eval --lage 0.0 --uage 1.0 --idname mrn 
+ * --ngrams 1 --cloptions="-W weka.classifiers.functions.pLogistic,-P 100"
+ * 
+ * another example is as following
+ * 
+ * --mt --ifile /home/ashwani/xyz/allfeedtype.csv --tcol 3 --agecol 2 
+ * --idcol 1 --lcol 7   --lage 0.0 --uage 1.0 --idname=mrn --ngrams 1:2:3 
+ * --dumparff=/home/ashwani/xyz/arff/biasedsettrigram.arff --dense
  *
  */
 public class MedicalTrainer {
 	private static Options options = new Options();
-	
+	private String[]  cloptions;
 	private static void addOptions() {
-		
+		options.addOption("dense", "denseinstance",false, "whether to use dense"
+				+"instance or not");
+		options.addOption("cloptions", "cloption",true, "option to the classifier must be included in brackets" +
+				"< cl options >, also mustbe at the end of the classifer");
+
 		options.addOption("removesinglecount", "removesinglecount", false, "Remove terms with" +
 				"single count in the termspace");
 		options.addOption("eval", "eval", false, "Are we doing just evaluatin? Using the weka" +
@@ -95,13 +112,17 @@ public class MedicalTrainer {
 				"os as to avoid making command line argument big");
 	}
 
-	
+	/**
+	 * launch pad for this
+	 * @throws Exception
+	 */
 	public void launchPad() throws Exception {
 		Counter<String> termspace = this.returnFreqDistOnSetOfNgrams();
 		if (this.removesinglecount)
 			termspace = KLDivergence.removeSingleCounteTerms(termspace);
 		this.trainingSet = this.returnIndicatorVectorOfTermSpace(termspace.keySet(),
 				true);
+		
 		if (this.predict) {
 			this.classifier = CommonClassifierRoutines.trainOnInstances(classifier, 
 					this.trainingSet, this.indicesToRemove,this.classifieroptions );
@@ -109,20 +130,42 @@ public class MedicalTrainer {
 					false);
 			testingSet.setClassMissingForEachInstance();
 		}
-		else if (this.eval)
+		else if (this.eval) 
 			this.evaluate();
-		else {
+		
+		else if (this.classifier != null && this.trainingSet != null){
 			CommonClassifierRoutines.leaveOneOutCrossValidation(this.classifier, this.trainingSet, 
 					this.indicesToRemove, this.indicesTodump, this.classifieroptions
 					, this.dumpfile);
 		}
+		if(this.dumparff != null) {
+			WekaRoutines.dumpArff(this.dumparff, this.trainingSet);
+		}
 			
 	}
-	public static MedicalTrainer  parserArgument(String[] commandargs) throws Exception {
+	
+	public String[] cloptionparser(String opt) {
+		StringTokenizer st  = new StringTokenizer(opt,",");
+		ArrayList<String> opts = new ArrayList<String>();
+		while (st.hasMoreTokens()) {
+			opts.add(st.nextToken());
+		}
+		return opts.size() == 0 ? null : 
+			opts.toArray(new String[opts.size()]);
+	}
+	
+	public static MedicalTrainer  parserArgument(String[] commandargs) 
+	throws Exception {
+		
 		MedicalTrainer.addOptions();
 		MedicalTrainer mt = new MedicalTrainer();
 		CommandLineParser cmdLineGnuParser = new GnuParser();
 		CommandLine command = cmdLineGnuParser.parse(options, commandargs);
+		if (command.hasOption("dense"))
+			mt.denseinstance = true;
+		if (command.hasOption("dumparff")) {
+			mt.dumparff = command.getOptionValue("dumparff");
+		}
 		if (command.hasOption("predict")) {
 			 mt.predict = true;
 		}
@@ -130,8 +173,11 @@ public class MedicalTrainer {
 			mt.setEval(true);
 		}
 		if (command.hasOption("cltype")) {
+			if (command.hasOption("cloptions")) {
+				mt.cloptions = mt.cloptionparser(command.getOptionValue("cloptions"));
+			}
 			mt.initClassifier(ClassifierType.valueOf(command.getOptionValue("cltype")),
-					null);
+					mt.cloptions);
 		}
 		if (command.hasOption("ifile")) {
 			mt.setFilename(command.getOptionValue("ifile"));
@@ -177,7 +223,7 @@ public class MedicalTrainer {
 		}
 		
 		if (command.hasOption("idname")) {
-			mt.setIdentifierName(command.getOptionValue("uage"));
+			mt.setIdentifierName(command.getOptionValue("idname"));
 		}
 		if (command.hasOption("ngrams")) {
 			String ngrams = command.getOptionValue("ngrams");
@@ -206,13 +252,32 @@ public class MedicalTrainer {
 			this.classifier = new SimpleLogistic(100, true , false);
 			this.classifier.setOptions(options);
 		}
+		else if (ctype.equals(ClassifierType.logistic)) {
+			this.classifier = new Logistic();
+			this.classifier.setOptions(options);
+		}
+		else if (ctype.equals(ClassifierType.adaboost)) {
+			this.classifier = new AdaBoostM1();
+			this.classifier.setOptions(options);
+		}
 	}
+	
+	private int numcrossfold;
 	private boolean removesinglecount=true;
+	private boolean denseinstance = false;
+	/**
+	 * Dump the training set to arff
+	 */
+	private String dumparff= null;
+	/**
+	 * file to dump the results to.
+	 */
 	private String dumpfile = null;
 	private String[] classifieroptions =null;
 	private boolean predict = false;
 	private WekaInstances trainingSet = null;
 	private boolean eval = false;
+	
 	/**
 	 * @return the eval
 	 */
@@ -487,7 +552,8 @@ public class MedicalTrainer {
 	 * @throws NumberFormatException
 	 * @throws IOException
 	 */
-	public  WekaInstances returnIndicatorVectorOfTermSpace(Set<String> termspace, boolean doNotAddUnkownClass)
+	public  WekaInstances returnIndicatorVectorOfTermSpace(Set<String> termspace,
+			boolean doNotAddUnkownClass)
 	throws NumberFormatException, IOException {
 		int numattributes = 0;
 		if (termspace != null)
@@ -501,11 +567,12 @@ public class MedicalTrainer {
 			numattributes++;
 		WekaInstances wekainstances = new WekaInstances(this.datasetname, new ArrayList<Attribute>(),
 				numattributes);
-		wekainstances.setSparseInstance(true);
+		wekainstances.setSparseInstance(!this.denseinstance);
 		int index = 0;
 		if (this.identifierCol >= 0) {
 			ArrayList<String> ambiguity=null;
-			wekainstances.insertAttributeAt(new Attribute(this.identifierName,ambiguity),index++);
+			wekainstances.insertAttributeAt(new Attribute(this.identifierName,
+					ambiguity),index++);
 						
 		}
 		if (this.agecol >= 0) {
@@ -592,8 +659,18 @@ public class MedicalTrainer {
 		
 		StringBuilder sb = new StringBuilder();
 		for(String tok: tokens) {
-			sb.append(tok);
-			sb.append(" ");
+			if (tok.contains("-")) {
+				StringTokenizer st  = new StringTokenizer(tok, "-");
+				while (st.hasMoreTokens()) {
+					sb.append(st.nextToken());
+					sb.append(" ");
+				}
+			}
+			else {
+				sb.append(tok);
+				sb.append(" ");
+			}
+			
 		}
 		String newstring = sb.toString().trim();
 		LucenePTBTokenizer lptb = 
@@ -656,8 +733,17 @@ public class MedicalTrainer {
 					MedicalTrainer.removeStopWords(tokens, this.stopwordlist);
 					StringBuilder sb = new StringBuilder();
 					for(String tok: tokens) {
-						sb.append(tok);
-						sb.append(" ");
+						if (tok.contains("-")) {
+							StringTokenizer st  = new StringTokenizer(tok, "-");
+							while (st.hasMoreTokens()) {
+								sb.append(st.nextToken());
+								sb.append(" ");
+							}
+						}
+						else {
+							sb.append(tok);
+							sb.append(" ");
+						}
 					}
 					String newstring = sb.toString().trim();
 					LucenePTBTokenizer lptb = 
@@ -740,8 +826,17 @@ public class MedicalTrainer {
 		
 		StringBuilder sb = new StringBuilder();
 		for(String tok: tokens) {
-			sb.append(tok);
-			sb.append(" ");
+			if (tok.contains("-")) {
+				StringTokenizer st  = new StringTokenizer(tok, "-");
+				while (st.hasMoreTokens()) {
+					sb.append(st.nextToken());
+					sb.append(" ");
+				}
+			}
+			else {
+				sb.append(tok);
+				sb.append(" ");
+			}
 		}
 		String newstring = sb.toString().trim();
 		LucenePTBTokenizer lptb = 
@@ -807,8 +902,17 @@ public class MedicalTrainer {
 			
 			StringBuilder sb = new StringBuilder();
 			for(String tok: tokens) {
-				sb.append(tok);
-				sb.append(" ");
+				if (tok.contains("-")) {
+					StringTokenizer st  = new StringTokenizer(tok, "-");
+					while (st.hasMoreTokens()) {
+						sb.append(st.nextToken());
+						sb.append(" ");
+					}
+				}
+				else {
+					sb.append(tok);
+					sb.append(" ");
+				}
 			}
 			String newstring = sb.toString().trim();
 			LucenePTBTokenizer lptb = 
