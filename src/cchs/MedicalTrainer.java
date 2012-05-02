@@ -10,6 +10,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -31,6 +33,7 @@ import edu.stanford.nlp.process.Morphology;
 import edu.stanford.nlp.stats.Counter;
 import edu.stanford.nlp.stats.Distribution;
 import edu.stanford.nlp.stats.IntCounter;
+import gate.util.compilers.eclipse.jdt.internal.compiler.ast.ThisReference;
 
 import au.com.bytecode.opencsv.CSVReader;
 import au.com.bytecode.opencsv.CSVWriter;
@@ -39,6 +42,8 @@ import stats.KLDivergence;
 import tokenizers.LucenePTBTokenizer;
 import tokenizers.NgramTokenizer;
 import tokenizers.StopWordList;
+import topicmodel.ModelContainer;
+import topicmodel.MultinomialDocumentModel;
 import weka.WekaInstances;
 import weka.WekaRoutines;
 import weka.classifiers.AbstractClassifier;
@@ -49,7 +54,9 @@ import weka.classifiers.J48Classifier;
 import weka.classifiers.functions.Logistic;
 import weka.classifiers.functions.SimpleLogistic;
 import weka.classifiers.meta.AdaBoostM1;
+import weka.classifiers.trees.J48;
 import weka.core.Attribute;
+import weka.core.Instance;
 import weka.core.Instances;
 
 /**
@@ -69,8 +76,13 @@ import weka.core.Instances;
  */
 public class MedicalTrainer {
 	private static Options options = new Options();
+	private List<Record> population = null;
 	private String[]  cloptions;
+	private ClassifierType cltype;
+	private boolean languageModel = false;
 	private static void addOptions() {
+		options.addOption("lm", "languagemodel",false, "whether to use language" +
+				"modelling or the simple indicator spaces");
 		options.addOption("dense", "denseinstance",false, "whether to use dense"
 				+"instance or not");
 		options.addOption("cloptions", "cloption",true, "option to the classifier must be included in brackets" +
@@ -112,22 +124,79 @@ public class MedicalTrainer {
 				"os as to avoid making command line argument big");
 	}
 
+	public static class Record {
+		private final String id;
+		/**
+		 * @return the text
+		 */
+		public String getText() {
+			return text;
+		}
+		/**
+		 * @param text the text to set
+		 */
+		public void setText(String text) {
+			this.text = text;
+		}
+		/**
+		 * @return the age
+		 */
+		public float getAge() {
+			return age;
+		}
+		/**
+		 * @param age the age to set
+		 */
+		public void setAge(float age) {
+			this.age = age;
+		}
+		/**
+		 * @return the textcategory
+		 */
+		public String getTextcategory() {
+			return textcategory;
+		}
+		/**
+		 * @param textcategory the textcategory to set
+		 */
+		public void setTextcategory(String textcategory) {
+			this.textcategory = textcategory;
+		}
+		/**
+		 * @return the id
+		 */
+		public String getId() {
+			return id;
+		}
+		private String text;
+		private float age;
+		private String textcategory;
+		public Record (String id) {
+			this.id = id;
+		}
+	}
 	/**
 	 * launch pad for this
 	 * @throws Exception
 	 */
 	public void launchPad() throws Exception {
-		Counter<String> termspace = this.returnFreqDistOnSetOfNgrams();
-		if (this.removesinglecount)
+		Counter<String> termspace = null;
+		if (this.languageModel) {
+			this.populateRecords();
+			this.doLanguageModelClassification();
+		}
+		else {
+		termspace = this.returnFreqDistOnSetOfNgrams();
+		if (this.removesinglecount) 
 			termspace = KLDivergence.removeSingleCounteTerms(termspace);
 		this.trainingSet = this.returnIndicatorVectorOfTermSpace(termspace.keySet(),
 				true);
-		
+		}
 		if (this.predict) {
 			this.classifier = CommonClassifierRoutines.trainOnInstances(classifier, 
 					this.trainingSet, this.indicesToRemove,this.classifieroptions );
-			WekaInstances testingSet= this.returnIndicatorVectorOfTermSpace(termspace.keySet(),
-					false);
+			WekaInstances testingSet= this.returnIndicatorVectorOfTermSpace(
+					termspace.keySet(),	false);
 			testingSet.setClassMissingForEachInstance();
 		}
 		else if (this.eval) 
@@ -161,6 +230,8 @@ public class MedicalTrainer {
 		MedicalTrainer mt = new MedicalTrainer();
 		CommandLineParser cmdLineGnuParser = new GnuParser();
 		CommandLine command = cmdLineGnuParser.parse(options, commandargs);
+		if (command.hasOption("lm"))
+			mt.languageModel = true;
 		if (command.hasOption("dense"))
 			mt.denseinstance = true;
 		if (command.hasOption("dumparff")) {
@@ -176,14 +247,15 @@ public class MedicalTrainer {
 			if (command.hasOption("cloptions")) {
 				mt.cloptions = mt.cloptionparser(command.getOptionValue("cloptions"));
 			}
-			mt.initClassifier(ClassifierType.valueOf(command.getOptionValue("cltype")),
+			mt.cltype = ClassifierType.valueOf(command.getOptionValue("cltype"));
+			mt.initClassifier(mt.cltype,
 					mt.cloptions);
 		}
 		if (command.hasOption("ifile")) {
 			mt.setFilename(command.getOptionValue("ifile"));
 		}
-		if (command.hasOption("ifile")) {
-			mt.setFilename(command.getOptionValue("ifile"));
+		if (command.hasOption("dfile")) {
+			mt.dumpfile = command.getOptionValue("dfile");
 		}
 		
 		if (command.hasOption("st")) {
@@ -247,6 +319,7 @@ public class MedicalTrainer {
 		if (ctype.equals(ClassifierType.j48)) {
 			this.classifier = new J48Classifier();
 			this.classifier.setOptions(options);
+			
 		}
 		else if (ctype.equals(ClassifierType.simplelogistic)) {
 			this.classifier = new SimpleLogistic(100, true , false);
@@ -536,7 +609,7 @@ public class MedicalTrainer {
 	 * @param identifierName : The name of identifier. (Need it to name 
 	 * the attribute of weka instances)
 	 * @param textcol : The column number of the text field in csv.
-	 * @param agecol : the column number of age column in csv file.
+	 * @param agecol : The column number of age column in csv file.
 	 * @param lowvalue : The lower limit of the age.
 	 * @param upvalue : The upper limit of age.
 	 * @param labelcol : The column number which contains the label we have
@@ -571,8 +644,7 @@ public class MedicalTrainer {
 		int index = 0;
 		if (this.identifierCol >= 0) {
 			ArrayList<String> ambiguity=null;
-			wekainstances.insertAttributeAt(new Attribute(this.identifierName,
-					ambiguity),index++);
+			wekainstances.insertAttributeAt(new Attribute(this.identifierName),index++);
 						
 		}
 		if (this.agecol >= 0) {
@@ -606,7 +678,7 @@ public class MedicalTrainer {
 			wekainstances.addWorkingInstance();
 			if (this.identifierCol >= 0) 
 				wekainstances.setValueOfWorkingInstance(this.identifierName,
-						nextLine[this.identifierCol-1]);
+						Integer.parseInt(nextLine[this.identifierCol-1]));
 			if (this.agecol >= 0)
 				wekainstances.setValueOfWorkingInstance("age",age);
 			String text = nextLine[this.textcol-1];
@@ -644,6 +716,44 @@ public class MedicalTrainer {
 		return wekainstances;
 	}
 	
+	
+	public List<String> returnTokens(String input, int ngram) {
+		List<String> uniqueTerms = new ArrayList<String>();
+		List<String> tokens = MedicalTrainer.ptbTokenizer(input);
+		if (this.lowercase)
+			MedicalTrainer.toLowerCase(tokens);
+		if (this.stopwordlist != null)
+			MedicalTrainer.removeStopWords(tokens,this.stopwordlist);
+		if (this.stem)
+			MedicalTrainer.simpleStem(tokens);		
+		if (this.stopwordlist != null)
+			MedicalTrainer.removeStopWords(tokens,this.stopwordlist);
+		
+		StringBuilder sb = new StringBuilder();
+		for(String tok: tokens) {
+			if (tok.contains("-")) {
+				StringTokenizer st  = new StringTokenizer(tok, "-");
+				while (st.hasMoreTokens()) {
+					sb.append(st.nextToken());
+					sb.append(" ");
+				}
+			}
+			else {
+				sb.append(tok);
+				sb.append(" ");
+			}
+			
+		}
+		String newstring = sb.toString().trim();
+		LucenePTBTokenizer lptb = 
+			new LucenePTBTokenizer(new StringReader(newstring));
+		NgramTokenizer ntokenizer = new NgramTokenizer(lptb, ngram);
+		ntokenizer.tokenize();
+		while(ntokenizer.hasNext()) {
+			uniqueTerms.add((String)ntokenizer.next());
+		}
+		return uniqueTerms;
+	}
 	
 	public  HashSet<String> returnUniqueNgramTermspace(String input, int ngram ) {
 		LinkedHashSet<String> uniqueTerms = new LinkedHashSet<String>();
@@ -1049,12 +1159,204 @@ public class MedicalTrainer {
 	}
 	
 	public void evaluate() throws Exception {
+		/*
+		if (this.cltype.equals(ClassifierType.simplelogistic)) {
+			Enumeration enm = ((SimpleLogistic)this.classifier).enumerateMeasures();
+			while(enm.hasMoreElements())
+				System.out.println(enm.nextElement());
+		}
+		*/
 		Instances instances = CommonClassifierRoutines.removeAttributes(
 				this.trainingSet,this.indicesToRemove);
 		Evaluation eval = new Evaluation(instances);
 		eval.crossValidateModel(this.classifier, instances, instances.numInstances(), 
 				new Random(1000));
 		System.out.println(eval.toSummaryString("\nResults\n======\n", false));
+		
 	}
 	
+	public List<String> getDocIds() throws IOException {
+		ArrayList<String> docs = new ArrayList<String>();
+		
+		CSVReader csvreader = new CSVReader(new FileReader(this.filename));
+		if (this.skipHeader)
+			csvreader.readNext();
+		String[] row=null;
+		while((row = csvreader.readNext()) != null) {
+			float age = Float.parseFloat(row[this.agecol -1]);
+			if (age < this.lowageval || age > this.upageval)
+				continue;
+			if (row.length < this.labelcol || 
+					row[this.labelcol -1].trim().length() <= 0)
+				continue;
+			if (!docs.contains(row[this.identifierCol-1]))
+				docs.add(row[this.identifierCol-1]);
+			else
+				System.out.println("don't want you to be here method  : getDocIds");
+		}
+		return docs;
+	}
+	
+	public List<MultinomialDocumentModel> populateModels() throws IOException {
+		List<MultinomialDocumentModel> models = 
+			new ArrayList<MultinomialDocumentModel>();
+		
+		for (int ngram : this.ngramsToGet) {
+			MultinomialDocumentModel md = new MultinomialDocumentModel(
+					new String(""+ngram));
+			for (Record record : this.population) {			
+				md.addDocModel(record.getId(), this.returnTokens(
+						record.getText(), ngram),record.getTextcategory());
+			}
+			models.add(md);
+		}
+		return models;
+	}
+	
+	
+	public Instance testInstanceOnLanguageModel(List<MultinomialDocumentModel> containers,
+			WekaInstances instances, String docId) throws IOException {
+		
+		for(Record record : this.population) {
+			if (!docId.equals(record.getId()))
+				continue;
+			String text = record.getText();
+			instances.initWorkingInstance();
+			instances.setValueOfWorkingInstance("id", record.getId());
+			instances.setValueOfWorkingInstance("age", record.getAge());
+			
+			for (MultinomialDocumentModel md : containers) {
+				List<String> X = null;
+				if (md.getModelName().equalsIgnoreCase("1"))
+					X = this.returnTokens(text, 1);
+				else if (md.getModelName().equalsIgnoreCase("2"))
+					X = this.returnTokens(text, 2);
+				else if (md.getModelName().equalsIgnoreCase("3"))
+					X = this.returnTokens(text, 3);
+				for (String topic : md.getTopics()) {
+					String attname = topic+"_"+md.getModelName();
+					instances.setValueOfWorkingInstance(attname,
+							md.getProbOfClassGivenDocument(X, topic));
+				}
+			}
+			instances.setValueOfWorkingInstance("class", record.getTextcategory());
+			Instance toreturn = instances.getWorkingInstance();
+			instances.initWorkingInstance();
+			return toreturn;
+		}
+		return null;
+	}
+	
+	public  List<Record> populateRecords() throws IOException{
+		if (this.population == null)
+			this.population = new ArrayList<Record>();
+		CSVReader csvreader = new CSVReader(new FileReader(this.filename));
+		if (this.skipHeader)
+			csvreader.readNext();
+		String[] row = null;
+		while ((row = csvreader.readNext()) != null) {
+			float age = Float.parseFloat(row[this.agecol -1]);
+			if (age < this.lowageval || age > this.upageval)
+				continue;
+			if (row.length < this.labelcol || 
+					row[this.labelcol -1].trim().length() <= 0)
+				continue;
+			Record record = new Record(row[this.identifierCol-1].trim());
+			record.setAge(age);
+			record.setText(row[this.textcol -1].trim());
+			record.setTextcategory( row[this.labelcol-1].trim());
+			this.population.add(record);
+		}
+		return this.population;
+	}
+	public  WekaInstances trainingOnLanguageModel(List<MultinomialDocumentModel> containers
+			, String doctoexclude) throws IOException {
+		
+		WekaInstances instances = new WekaInstances(this.datasetname,
+				new ArrayList<Attribute>(), 0);
+		int index=0;
+		instances.addStringAttribute("id", index++);
+		instances.insertAttributeAt(new Attribute("age"), index++);
+		for (MultinomialDocumentModel md : containers) {
+			for (String topic : md.getTopics()) {
+				instances.insertAttributeAt(new Attribute(topic+"_"
+						+md.getModelName()), index++);
+			}			
+		}
+		
+		ArrayList<String> topics = new ArrayList<String>();
+		for (MultinomialDocumentModel md : containers) {
+			for (String topic : md.getTopics()) {
+				if (!topics.contains(topic))
+					topics.add(topic);
+			}
+		}
+		
+		instances.addClassAttribute("class",topics);
+		
+		for (Record record : this.population) {
+			instances.initWorkingInstance();
+			if (doctoexclude != null && record.getId().equals(doctoexclude))
+				continue;
+			
+			instances.setValueOfWorkingInstance("id", record.getId());
+			instances.setValueOfWorkingInstance("age", record.getAge());
+			for (MultinomialDocumentModel md : containers) {
+				List<String> X = null;
+				if (md.getModelName().equalsIgnoreCase("1"))
+					X = this.returnTokens(record.getText(), 1);
+				else if (md.getModelName().equalsIgnoreCase("2"))
+					X = this.returnTokens(record.getText(), 2);
+				else if (md.getModelName().equalsIgnoreCase("3"))
+					X = this.returnTokens(record.getText(), 3);
+				for (String topic : md.getTopics()) {
+					String attname = topic+"_"+md.getModelName();
+					instances.setValueOfWorkingInstance(attname,
+							md.getProbOfClassGivenDocument(X, topic));
+				}
+			}
+			//System.out.println( row[this.labelcol -1]);
+			instances.setValueOfWorkingInstance("class", record.getTextcategory());
+			instances.addWorkingInstance();
+		}
+		
+		return instances;
+	}
+	
+	
+	public void doLanguageModelClassification() throws Exception {
+		List<MultinomialDocumentModel> container = this.populateModels();
+		
+		int missclassifier = 0;
+		int count =0;
+		for (Record record : this.population) {
+			String docid = record.getId();
+			for (MultinomialDocumentModel md : container) {
+				md.storeAndRemoveDoc(docid);
+			}
+			
+			WekaInstances training = this.trainingOnLanguageModel(container, docid);
+			
+		
+			AbstractClassifier classifier =  
+				CommonClassifierRoutines.trainOnInstances(this.classifier ,training, 
+						new int[] {0,1}, this.cloptions);
+			training.clear();
+			Instance testinstance = this.testInstanceOnLanguageModel(container,
+					training, docid);
+			if (!CommonClassifierRoutines.testInstances(classifier, testinstance, 
+					training,new int[] {0,1})) {
+				missclassifier++;
+				System.out.println("incrementing missclassififcaion "+missclassifier +
+						" round number "+ count + " doc id" + docid + " age "+ record.getAge());
+				
+			}
+			for (MultinomialDocumentModel md : container) {
+				md.storeAndRemoveDoc(docid);
+			}
+			count++;
+		}
+		System.out.println(missclassifier+ " "+this.population.size());
+		
+	}
 }

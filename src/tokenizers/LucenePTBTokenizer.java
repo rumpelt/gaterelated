@@ -21,8 +21,10 @@ import edu.stanford.nlp.process.PTBTokenizer;
 /**
  * @author ashwani
  * Look at the default PTB options.
- * Also look at you can set the PTB options.
+ * Also look at you what can be set for the PTB options.
  * A Stanford PTB tokenizer which can be used by Lucene.
+ * Also A generic unigram tokenizer.
+ * Requires Stannford NLP jar and Lucene 3.5 jar
  */
 
 public class LucenePTBTokenizer extends Tokenizer implements StanfordTokenizer{

@@ -27,8 +27,9 @@ public class MainDriver {
 		// TODO Auto-generated method stub	
 		final Configuration conf = new Configuration();
 	    List<Vector> vecs = SequenceFileReader.getAllVector(conf, 
-				"/home/ashwani/xyz/arff/biasedsetunigram.arff.mvc");
-		LogisticRegression.doLeaveOneOutCrossValidation(vecs);
+				"/home/ashwani/xyz/arff/triSet1-2.mvc");
+		LogisticRegression.doLeaveOneOutCrossValidation(vecs,
+				"/home/ashwani/xyz/arff/triSet1-2.csv");
 	}
 	
 }	

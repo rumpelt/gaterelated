@@ -25,7 +25,8 @@ public final class StopWordList {
 	static List<String> medicalWords=   Arrays.asList(
 		      "a", "an",  "are", "as", "at", "be",  
 		       "is", "it", "that", "the", "their", "then", "there", "these",
-		      "they", "this", "to", "was", "will",",",".",";","-", "--","Voiding", "voiding");
+		      "they", "this", "to", "was", "will",",",".",";","-", "--","Voiding",
+		      "voiding");
 	public static Set<?> getMedicalStopWordList(Version version) {
 		
 		
