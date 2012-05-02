@@ -75,6 +75,28 @@ public final class CommonClassifierRoutines {
 		return classifier;		
 	}
 	
+	public  static boolean testInstances(AbstractClassifier classifier,
+			Instance instance, Instances trainSet,	int[] indicesToDelete) 
+	throws Exception {
+	
+		trainSet.add(instance);
+		Instances newInstances = trainSet;
+		if (indicesToDelete != null) {
+			Remove rm = null;
+			rm = new Remove();
+			rm.setAttributeIndicesArray(indicesToDelete);
+			rm.setInputFormat(trainSet);
+			newInstances = Filter.useFilter(trainSet, rm);
+		}
+		instance = newInstances.get(trainSet.size() -1);
+		double result = classifier.classifyInstance(instance);
+		String classname = instance.classAttribute().value((int)result);
+		
+		if (classname.equals(instance.stringValue(newInstances.classAttribute())))
+			return true;
+		else
+			return false;
+	}
 	/**
 	 * Test each instance and dump some output on terminal or in file. 
 	 * @param instances : Set of instance
@@ -163,6 +185,8 @@ public final class CommonClassifierRoutines {
 		return result;
 	}
 	
+
+	
 	public static void leaveOneOutCrossValidation(AbstractClassifier classifier ,
 			Instances instances, int[] indicesTORemove, int [] indicesToPrint,
 			String[] options, String dumpfile) throws Exception {
@@ -177,8 +201,10 @@ public final class CommonClassifierRoutines {
 			
 			classifier = CommonClassifierRoutines.trainOnInstances(classifier, trainSet, null, options);
 			double result = classifier.classifyInstance(copied.get(i));
-		
-			String[] dump = new String[indicesToPrint.length+2];
+			double[] dists = classifier.distributionForInstance(copied.get(i)) ;
+			// For the following array initialization 2 is actual class value and
+			// predicted class value and one column for if prediction is true or false
+			String[] dump = new String[indicesToPrint.length+3+ instances.classAttribute().numValues()];
 			for (int cnt = 0; cnt < dump.length; cnt++)
 				dump[cnt] = "";
 			int dumpind = 0;
@@ -191,10 +217,19 @@ public final class CommonClassifierRoutines {
 			}
 			
 			dump[dumpind++] = instances.get(i).stringValue(instances.classAttribute());
-			dump[dumpind] = instances.classAttribute().value((int)result);
-			if (csvWriter != null && !instances.get(i).stringValue(instances.classAttribute()).equals(dump[dumpind]))
+			dump[dumpind++] = instances.classAttribute().value((int)result);
+			if (dump[dumpind-1].equals(dump[dumpind-2]))
+				dump[dumpind++] = "1";
+			else
+				dump[dumpind++] = "0";
+			for (double val : dists)
+				dump[dumpind++] = new String(""+val);
+			
+		
+			if (csvWriter != null)
 				csvWriter.writeNext(dump);
-			else if (!instances.get(i).stringValue(instances.classAttribute()).equals(dump[dumpind]))
+			else if (!instances.get(i).stringValue(
+					instances.classAttribute()).equals(dump[dumpind]))
 				System.out.println(dump);
 			
 		}

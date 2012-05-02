@@ -91,6 +91,21 @@ public class WekaInstances extends Instances {
 		this.insertAttributeAt(new Attribute(attributeName,possibleValues), this.numAttributes());
 		this.setClassIndex(this.numAttributes() -1);
 	}
+	
+	public void addNominalAttribute(String attributeName, List<String> possibleValues
+			, int index) {
+		this.insertAttributeAt(new Attribute(attributeName,possibleValues),
+				index);
+	}
+	
+	public void addNominalAttribute(String attributeName, Enum<?>[] possibleValues
+			, int index) {
+		ArrayList<String> values = new ArrayList<String>();
+		for (Enum<?> val : possibleValues)
+			values.add(val.toString());
+		this.insertAttributeAt(new Attribute(attributeName,values),
+				index);
+	}
 	/**
 	 * initalizes/reinitializes the temporary instance workingInstance of this
 	 * class. 
@@ -163,7 +178,7 @@ public class WekaInstances extends Instances {
 		
 	}
 	
-
+	
 	/**
 	 * Adds the temporary instance workingInstance of this class to the 
 	 * super class which is a Instances object.
