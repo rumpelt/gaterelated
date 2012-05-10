@@ -23,9 +23,40 @@ public class NgramTokenizer extends LuceneTokenizer implements Tokenizer {
 	private Tokenizer basetokenizer;
 	private int maxngram;
 	private int minngram;
-	int curroffset;
-	int numBaseTokens;
-	List<String> tokens;
+	private int curroffset;
+	/**
+	 * @return the curroffset
+	 */
+	public int getCurroffset() {
+		return curroffset;
+	}
+
+	/**
+	 * @param curroffset the curroffset to set
+	 */
+	public void setCurroffset(int curroffset) {
+		this.curroffset = curroffset;
+	}
+
+	private int numBaseTokens;
+	/**
+	 * contain unigram tokens used to generate ngrams
+	 */
+	private List<String> tokens;
+	/**
+	 * @return the tokens
+	 */
+	public List<String> getTokens() {
+		return tokens;
+	}
+
+	/**
+	 * @param tokens the tokens to set
+	 */
+	public void setTokens(List<String> tokens) {
+		this.tokens = tokens;
+	}
+
 	public NgramTokenizer(Tokenizer tokenizer, int ngram) {
 		this.maxngram = ngram;
 		this.minngram = ngram;
