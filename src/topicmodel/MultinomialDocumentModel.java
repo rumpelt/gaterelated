@@ -15,31 +15,32 @@ import edu.stanford.nlp.stats.IntCounter;
 
 /**
  * 
- * @author ashwani
- * Based on the paper 
+ * @author ashwani Based on the paper
  */
 public class MultinomialDocumentModel {
 	private final String modelName;
-	
+
 	private String tempDocId;
 	private Counter<String> tempCounterForTempDoc;
 	private String topicOfTempDoc;
-	
+
 	public void storeAndRemoveDoc(String docId) {
-		this.tempDocId = docId;
+		this.tempDocId = new String(docId);
 		this.tempCounterForTempDoc = this.docCounters.get(docId);
 		this.topicOfTempDoc = this.docTopicMap.get(docId);
 		this.removeDocFromModel(docId);
 	}
-	
-	public void restoreDocaAndCounters(String docId) {
+
+	public void restoreDocAndCounters(String docId) {
 		if (docId.equals(this.tempDocId)) {
-			this.docCounters.put(docId, this.tempCounterForTempDoc) ;
+			if (this.tempCounterForTempDoc != null)
+				this.docCounters.put(docId, this.tempCounterForTempDoc);
 			if (this.topicOfTempDoc != null)
 				this.docTopicMap.put(docId, this.topicOfTempDoc);
 		}
-		
+
 	}
+
 	/**
 	 * @return the modelName
 	 */
@@ -50,61 +51,123 @@ public class MultinomialDocumentModel {
 	public MultinomialDocumentModel(String modelName) {
 		this.modelName = modelName;
 	}
+
 	/**
 	 * Counter for each of the documents
 	 */
-	private HashMap<String, Counter<String>> docCounters = new HashMap<String,
-	Counter<String>>();
-	
+	private HashMap<String, Counter<String>> docCounters = new HashMap<String, Counter<String>>();
+
 	/**
 	 * Mapping from each of the document to actual topic it was assigned
 	 */
 	private HashMap<String, String> docTopicMap = new HashMap<String, String>();
-	
+
+	/**
+	 * String representaion of various terms and probabiliites etc. Useful for
+	 * debug purpose. Created this to debug the trigram model.
+	 */
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("model name " + this.modelName + "\n");
+		Counter<String> topics = this.getTopicCounter();
+		sb.append("topic frequency and distribution" + "\n");
+		for (String key : topics.keySet()) {
+			sb.append(" key : " + key + " " + topics.getCount(key));
+		}
+		sb.append("\n");
+		sb.append("topic probabilites" + "\n");
+		for (String classes : this.getTopics()) {
+			sb.append(" " + classes + " "
+					+ this.getClassPriorProbability(classes) + "\n");
+		}
+
+		sb.append("\n");
+		sb.append("term frequency in various topics" + "\n");
+		for (String topic : this.docCounters.keySet()) {
+			sb.append("docid :" + topic + "\n");
+			Counter<String> counter = this.docCounters.get(topic);
+			for (String key : counter.keySet()) {
+				sb.append("term : " + key + " count:" + counter.getCount(key)
+						+ "\n");
+			}
+		}
+		sb.append("Various distribution parameter. " + "\n");
+		for (String docid : this.docCounters.keySet()) {
+			// this.storeAndRemoveDoc(docid);
+			sb.append("doc id : " + docid + " doc likelyhood "
+					+ this.documentLikelyhood(docid) + " ");
+			for (String classes : this.getTopics()) {
+				sb.append(" prob of class give doc " + classes + " "
+						+ this.getProbOfClassGivenDocument(docid, classes)
+						+ " prob of doc given class "
+						+ this.getProbabilityOfDocGivenClass(docid, classes));
+			}
+			sb.append("\n");
+			// this.restoreDocAndCounters(docid);
+		}
+		return sb.toString();
+	}
+
+	public Counter<String> getTopicCounter() {
+		Counter<String> counter = new IntCounter<String>();
+		for (String val : this.docTopicMap.values())
+			counter.incrementCount(val);
+		return counter;
+	}
+
 	public List<String> getTopics() {
 		ArrayList<String> topics = new ArrayList<String>();
 		for (String topic : this.docTopicMap.values()) {
 			if (!topics.contains(topic))
 				topics.add(topic);
 		}
+		if (this.topicOfTempDoc != null
+				&& !topics.contains(this.topicOfTempDoc))
+			topics.add(this.topicOfTempDoc);
 		Collections.sort(topics);
-		return topics;	
+		return topics;
 	}
+
 	public void addDocModel(String docId, List<String> input, String topicName) {
+
+		if (input == null || input.size() <= 0)
+			return;
+
 		Counter<String> counter = new IntCounter<String>();
-		
 		for (String term : input) {
 			counter.incrementCount(term);
 		}
-		
-		if (counter.totalCount() > 0) {
+
+		if (counter.totalCount() > 0.0) {
 			this.docCounters.put(docId, counter);
 			if (topicName != null)
 				this.docTopicMap.put(docId, topicName);
 		}
-			
+
 	}
-	
+
 	public void addDocTopic(String docId, String topicName) {
 		if (topicName != null)
 			this.docTopicMap.put(docId, topicName);
 	}
-	
+
 	public void addTopicOfDocument(String docid, String topic) {
 		this.docTopicMap.put(docid, topic);
 	}
-	
+
 	public void addCounter(String docid, Counter<String> counter) {
-		
-		this.docCounters.put(docid, counter);
+		if (counter != null && counter.size() > 0)
+			this.docCounters.put(docid, counter);
 	}
-	
+
 	public void removeDocFromModel(String docId) {
 		this.docCounters.remove(docId);
 		this.docTopicMap.remove(docId);
 	}
-	
+
 	public void addCounter(String docid, List<String> input) {
+		if (input == null || input.size() <= 0)
+			return;
 		Counter<String> counter = new IntCounter<String>();
 		for (String string : input) {
 			counter.incrementCount(string);
@@ -112,80 +175,81 @@ public class MultinomialDocumentModel {
 		if (counter.keySet().size() > 0)
 			this.docCounters.put(docid, counter);
 	}
-	
+
 	public boolean checkEqualityOfCounter(Counter<String> cnt1,
 			Counter<String> cnt2) {
-		
-		boolean result = true;		
+
+		boolean result = true;
 		if (cnt1.keySet().size() != cnt2.keySet().size())
 			return false;
-		
-		for (String key : cnt1.keySet() ) {
+
+		for (String key : cnt1.keySet()) {
 			if (cnt1.getCount(key) != cnt2.getCount(key)) {
 				result = false;
 				break;
-			}				
-		}		
+			}
+		}
 		return result;
 	}
-	
+
 	/**
 	 * 
-	 * P(Wt | Cj)
-	 * Following refrences
-	 * learning to classify from text from labeled and unlabeled data (kamal nigam
-	 * , andrew mccallum)
-	 * or 
-	 * Comparison of event model for naive bayes text classification (mccallum) 
+	 * P(Wt | Cj) Following refrences learning to classify from text from
+	 * labeled and unlabeled data (kamal nigam , andrew mccallum) or Comparison
+	 * of event model for naive bayes text classification (mccallum)
+	 * 
 	 * @param word
 	 * @param topic
 	 * @return
 	 */
 	public double getProbabilityOfWordGivenClass(String word, String topic,
 			List<String> vocab) {
-		
+
 		double wordCount = 1; // initialized to 1 for smoothing
-		
+
 		for (String docId : this.docCounters.keySet()) {
 			if (topic.equals(this.docTopicMap.get(docId)))
-				wordCount = wordCount + this.docCounters.get(docId).getCount(word);
+				wordCount = wordCount
+						+ this.docCounters.get(docId).getCount(word);
 		}
-		double totalWordCount = vocab.size(); // initailized to vocab size for smoothing
+		double totalWordCount = vocab.size(); // initailized to vocab size for
+												// smoothing
 		for (String term : vocab) {
 			for (String docId : this.docCounters.keySet()) {
 				if (topic.equals(this.docTopicMap.get(docId)))
-					totalWordCount = totalWordCount + 
-				this.docCounters.get(docId).getCount(term);
+					totalWordCount = totalWordCount
+							+ this.docCounters.get(docId).getCount(term);
 			}
 		}
 		return wordCount / totalWordCount;
 	}
-	
-	
-	public double probabilityOfDocLenght(String docId) {
+
+	public double probabilityOfDocLength(String docId) {
 		Counter<Integer> counter = new IntCounter<Integer>();
-		for (String doc: this.docCounters.keySet()) {
-			counter.incrementCount((int)this.docCounters.get(doc).totalCount());
+		for (String doc : this.docCounters.keySet()) {
+			counter.incrementCount((int) this.docCounters.get(doc).totalCount());
 		}
-		return Distribution.getDistribution(counter).probabilityOf((int)this.docCounters.get(docId).totalCount());
+
+		return Distribution.getDistribution(counter).probabilityOf(
+				(int) this.docCounters.get(docId).totalCount());
 	}
-	
-	public double probabilityOfDocLenght(List<String> input) {
+
+	public double probabilityOfDocLength(List<String> input) {
 		Counter<Integer> counter = new IntCounter<Integer>();
-		for (String doc: this.docCounters.keySet()) {
-			counter.incrementCount((int)this.docCounters.get(doc).totalCount());
+		for (String doc : this.docCounters.keySet()) {
+			counter.incrementCount((int) this.docCounters.get(doc).totalCount());
 		}
-		return Distribution.getDistribution(counter).probabilityOf(input.size());
+		return Distribution.getDistribution(counter)
+				.probabilityOf(input.size());
 	}
-	
-	
+
 	public double getProbabilityOfDocGivenClass(String docId, String topicName) {
-		
+
 		double prob = 1.0;
 		List<String> vocab = new ArrayList<String>();
-		
+
 		for (String key : this.docCounters.keySet()) {
-			for (String term : this.docCounters.get(key).keySet()) 
+			for (String term : this.docCounters.get(key).keySet())
 				if (!vocab.contains(term))
 					vocab.add(term);
 		}
@@ -193,42 +257,47 @@ public class MultinomialDocumentModel {
 			double termCount = this.docCounters.get(docId).getCount(term);
 			if (termCount == 0.0)
 				continue;
-			double termProb = this.getProbabilityOfWordGivenClass(term, topicName, vocab);
+			double termProb = this.getProbabilityOfWordGivenClass(term,
+					topicName, vocab);
 			termProb = Math.pow(termProb, termCount);
-			termProb = termProb/ factorial((int) termCount);
+			termProb = termProb / factorial((int) termCount);
 			prob = prob * termProb;
 		}
-		prob = factorial((int)this.docCounters.get(docId).totalCount()) * prob;
-		return this.probabilityOfDocLenght(docId) * prob;
+		prob = factorial((int) this.docCounters.get(docId).totalCount()) * prob;
+		return prob;
+		// return this.probabilityOfDocLenght(docId) * prob;
 	}
-	
-public double getProbabilityOfDocGivenClass(List<String> input , String topicName) {
-		if (input.size() == 0)
+
+	public double getProbabilityOfDocGivenClass(List<String> input,
+			String topicName) {
+		if (input == null || input.size() == 0)
 			return 0.0;
 		double prob = 1.0;
 		List<String> vocab = new ArrayList<String>();
-		
+
 		for (String key : this.docCounters.keySet()) {
-			for (String term : this.docCounters.get(key).keySet()) 
+			for (String term : this.docCounters.get(key).keySet())
 				if (!vocab.contains(term))
 					vocab.add(term);
 		}
 		Counter<String> counter = new IntCounter<String>();
-		for (String text: input) {
+		for (String text : input) {
 			counter.incrementCount(text);
 		}
-		
+
 		for (String term : vocab) {
 			double termCount = counter.getCount(term);
 			if (termCount == 0.0)
 				continue;
-			double termProb = this.getProbabilityOfWordGivenClass(term, topicName, vocab);
+			double termProb = this.getProbabilityOfWordGivenClass(term,
+					topicName, vocab);
 			termProb = Math.pow(termProb, termCount);
-			termProb = termProb/ factorial((int) termCount);
+			termProb = termProb / factorial((int) termCount);
 			prob = prob * termProb;
 		}
-		prob = factorial((int)counter.totalCount()) * prob;
-		return this.probabilityOfDocLenght(input) * prob;
+		prob = factorial((int) counter.totalCount()) * prob;
+		return prob;
+		// return this.probabilityOfDocLenght(input) * prob;
 	}
 
 	public double documentLikelyhood(List<String> input) {
@@ -245,8 +314,8 @@ public double getProbabilityOfDocGivenClass(List<String> input , String topicNam
 		}
 		return result;
 	}
-	
-	public double documentLikelyhood(String  docId) {
+
+	public double documentLikelyhood(String docId) {
 		ArrayList<String> classes = new ArrayList<String>();
 		for (String key : this.docTopicMap.values()) {
 			if (!classes.contains(key))
@@ -260,31 +329,34 @@ public double getProbabilityOfDocGivenClass(List<String> input , String topicNam
 		}
 		return result;
 	}
-	
+
 	public double getProbOfClassGivenDocument(String docId, String topicName) {
 		double classPrior = this.getClassPriorProbability(topicName);
-		double docCondProb = this.getProbabilityOfDocGivenClass(docId, topicName);
+		double docCondProb = this.getProbabilityOfDocGivenClass(docId,
+				topicName);
 		if (docCondProb == 0.0)
 			return 0.0;
-		
+
 		double docLikelyHood = this.documentLikelyhood(docId);
-		return (classPrior/ docLikelyHood) * docCondProb;
+		return (classPrior / docLikelyHood) * docCondProb;
 	}
-	
-	public double getProbOfClassGivenDocument(List<String> input, String topicName) {
+
+	public double getProbOfClassGivenDocument(List<String> input,
+			String topicName) {
 		double classPrior = this.getClassPriorProbability(topicName);
-		double docCondProb = this.getProbabilityOfDocGivenClass(input, topicName);
+		double docCondProb = this.getProbabilityOfDocGivenClass(input,
+				topicName);
 		if (docCondProb == 0.0)
 			return 0.0;
 		double docLikelyHood = this.documentLikelyhood(input);
-		return (classPrior/ docLikelyHood) * docCondProb;
+		return (classPrior / docLikelyHood) * docCondProb;
 	}
+
 	/**
-	 * learning to classify from text from labeled and unlabeled data (kamal nigam
-	 * , andrew mccallum)
-	 * or 
-	 * Comparison of event model for naive bayes text classification
-	 * P(Cj | Theta)
+	 * learning to classify from text from labeled and unlabeled data (kamal
+	 * nigam , andrew mccallum) or Comparison of event model for naive bayes
+	 * text classification P(Cj | Theta)
+	 * 
 	 * @return
 	 */
 	public double getClassPriorProbability(String topicName) {
@@ -296,20 +368,15 @@ public double getProbabilityOfDocGivenClass(List<String> input , String topicNam
 		}
 		return classcount / numdocs;
 	}
-	
-	public static int factorial( int iNo ) {
 
-        // Make sure that the input argument is positive
+	public static int factorial(int iNo) {
+		if (iNo < 0)
+			throw new IllegalArgumentException("iNo must be >= 0");
+		int factorial = 1;
+		for (int i = 2; i <= iNo; i++)
+			factorial *= i;
 
-	if (iNo < 0) throw
-           new IllegalArgumentException("iNo must be >= 0");
+		return factorial;
+	}
 
-        // Use simple look to compute factorial....
-
-        int factorial = 1;
-        for(int i = 2; i <= iNo; i++) 
-            factorial *= i;               
-
-        return factorial;
-    }
 }
