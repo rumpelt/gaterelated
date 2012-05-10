@@ -118,7 +118,7 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 			// TODO Auto-generated method stub
 			return new StopFilter(this.versionNumber,
 					new LowerCaseFilter(this.versionNumber, 
-					new LucenePTBTokenizer(arg1)), StopWordList.getMedicalStopWordList(this.versionNumber), true);
+					new LucenePTBTokenizer(arg1)), StopWordList.getCchsStopWordList(this.versionNumber), true);
 			/*
 			return new StopFilter(true,
 					new PorterStemFilter(
