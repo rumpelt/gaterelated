@@ -3,20 +3,24 @@
  */
 package mahout.classifiers;
 
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import mahout.commonroutines.CommonRoutines;
 
+import org.apache.mahout.classifier.sgd.AbstractOnlineLogisticRegression;
 import org.apache.mahout.classifier.sgd.L1;
 import org.apache.mahout.classifier.sgd.L2;
 import org.apache.mahout.classifier.sgd.OnlineLogisticRegression;
-import org.apache.mahout.classifier.sgd.UniformPrior;
+import org.apache.mahout.classifier.sgd.PriorFunction;
+import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.Vector;
+
+import stats.Sampling;
+
+
 
 import au.com.bytecode.opencsv.CSVWriter;
 
@@ -26,6 +30,63 @@ import au.com.bytecode.opencsv.CSVWriter;
  *
  */
 public class LogisticRegression extends OnlineLogisticRegression {
+	
+	private static PriorFunction priorfunction = new L1();
+	
+	public static AbstractOnlineLogisticRegression trainOnVector(
+			List<Vector> input, int numfeatures , int numcategories, 
+			boolean randomSample,
+			int numIteration) {
+		OnlineLogisticRegression ol = new OnlineLogisticRegression(numcategories,
+				numfeatures, LogisticRegression.priorfunction);
+		
+		if (!randomSample)
+			numIteration= 1;
+		List<?> randomized = input;
+		for (int count = 0 ; count < numIteration; count++) {
+			if (count > 1)
+				randomized= Sampling.sampleWithoutReplacement(input,
+					 input.size());
+			 for (Object v : randomized) {
+				 Vector totrain = (Vector)v;
+		//
+			//	 System.out.println(totrain+" : "+(int)totrain.get(totrain.size() -1 ));
+				 ol.train((int)totrain.get(totrain.size() -1 ), totrain.viewPart(0,
+						 totrain.size() -1 ));
+			 }
+		}
+		return ol;
+	}
+	
+	public static int test(Vector test, boolean categoryPresent,
+			AbstractOnlineLogisticRegression ol, boolean returnClassPrediction,
+			double[] classProb) {
+		int actual = 0;
+		int predicted = 0;
+		//System.out.println("class logisticregression in mahout function : test: "+test);
+		if (categoryPresent) {
+			actual = (int) test.get(test.size() -1);
+			test = test.viewPart(0, test.size() -1);
+		}
+		Vector result = ol.classify(test);
+		//Matrix m = ol.getBeta();
+		//System.out.println(m);
+		double totalsum=0;
+		for (int count = 0; count < result.size();count++) {
+			totalsum = totalsum + result.get(count);
+		}
+		double base = 1.0 - totalsum;
+		classProb[0] = base;
+		if (result.maxValue() > base) {
+			predicted = result.maxValueIndex() + 1;
+			classProb[0] = result.maxValue();
+		}
+		
+		if (returnClassPrediction)
+			return predicted;
+		else
+			return (actual == predicted) ? 1 : 0;		
+	}
 	/**
 	 * remove some of the indices
 	 * @param input
@@ -126,4 +187,7 @@ public class LogisticRegression extends OnlineLogisticRegression {
 				e.printStackTrace();
 			}
 	}
+	
+	
+	
 }
