@@ -2,4 +2,5 @@ bin
 .classpath
 .project
 src/heritage
+build
 file:

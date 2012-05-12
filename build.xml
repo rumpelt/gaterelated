@@ -1,0 +1,33 @@
+<project name="gaterelated" default="dist" basedir=".">
+    <description>
+   	build file for the gate related project
+    </description>
+    <property environment="env"/>
+    <property name="build" location="build"/>
+    <property name="dist" location="dist"/> 
+    <property name="src" location="src"/>
+    <path id="gaterelated.classpath">
+ 	<pathelement path="${java.class.path}"/> 
+ 	<fileset dir="/usa/arao/jar">
+ 	   <include name="*.jar"/>
+ 	</fileset>
+    </path>	
+    <target name="init">
+       <tstamp/>
+       <mkdir dir="${build}"/>
+       <mkdir dir="${dist}"/>
+    </target>
+    <target name="compile" depends="init" description="compile the whole damnn thing">
+        <javac 	srcdir="${src}" destdir="${build}">
+           <classpath refid="gaterelated.classpath"/>
+        </javac>
+    </target>
+    <target name="dist" depends="compile">
+	<mkdir dir="${dist}/lib"/>
+	<jar jarfile="${dist}/lib/gaterelated-${DSTAMP}.jar" basedir="${build}"/>
+    </target>
+    <target name="clean"  description="clean the project">
+        <delete dir="${build}"/>
+        <delete dir="${dist}"/>
+    </target>
+</project>
