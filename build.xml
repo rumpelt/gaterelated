@@ -6,7 +6,13 @@
     <property name="build" location="build"/>
     <property name="dist" location="dist"/> 
     <property name="src" location="src"/>
+    <path id="gaterelated.dist">
+    	<fileset dir="./dist/lib">
+    	   <include name="*.jar"/>
+    	</fileset>
+    </path>
     <path id="gaterelated.classpath">
+
  	<pathelement path="${java.class.path}"/> 
  	<fileset dir="/usa/arao/jar">
  	   <include name="*.jar"/>
@@ -18,7 +24,7 @@
        <mkdir dir="${dist}"/>
     </target>
     <target name="compile" depends="init" description="compile the whole damnn thing">
-        <javac 	srcdir="${src}" destdir="${build}">
+        <javac 	srcdir="${src}" destdir="${build}" debug="true" debuglevel="lines,vars,source">
            <classpath refid="gaterelated.classpath"/>
         </javac>
     </target>
@@ -29,5 +35,11 @@
     <target name="clean"  description="clean the project">
         <delete dir="${build}"/>
         <delete dir="${dist}"/>
+    </target >
+    <target name="weka">
+    	<java classname="weka.MainDriver" failonerror="true" fork="yes">
+    	    <classpath refid="gaterelated.classpath"/>
+    	    <classpath refid="gaterelated.dist"/>
+    	 </java>
     </target>
 </project>

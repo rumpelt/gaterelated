@@ -5,7 +5,11 @@ package cchs;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ExecutorService;
+import java.lang.Runnable;
+import java.util.concurrent.FutureTask;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -79,6 +83,7 @@ import weka.core.Instances;
 public class MedicalTrainer extends Object {
 	private static Options options = new Options();
 	private List<Record> population = null;
+  
 	private String[] cloptions;
 	private ClassifierType cltype;
 	private boolean languageModel = false;
@@ -224,7 +229,7 @@ public class MedicalTrainer extends Object {
 		Counter<String> termspace = null;
 		if (this.languageModel) {
 			this.populateRecords();
-			this.doLanguageModelWithSampling(100, 10);
+			this.doLanguageModelWithSampling(200, 10);
 		} else {
 			termspace = this.returnFreqDistOnSetOfNgrams();
 			if (this.removesinglecount)
@@ -1004,7 +1009,7 @@ public class MedicalTrainer extends Object {
 
 	public void evaluate() throws Exception {
 		/*
-		 * if (this.cltype.equals(ClassifierType.simplelogistic)) { Enumeration
+	        * if (this.cltype.equals(ClassifierType.simplelogistic)) { Enumeration
 		 * enm = ((SimpleLogistic)this.classifier).enumerateMeasures();
 		 * while(enm.hasMoreElements()) System.out.println(enm.nextElement()); }
 		 */
@@ -1038,23 +1043,62 @@ public class MedicalTrainer extends Object {
 						.println("don't want you to be here method  : getDocIds");
 		}
 		return docs;
+	
+        }
+
+        public  static class DocumentModel extends FutureTask<MultinomialDocumentModel>{
+            final int ngram ;
+            MultinomialDocumentModel model=null;
+            final List<Record> records;
+	    final MedicalTrainer mt;
+            public DocumentModel(int ngram,  List<Record> records, MedicalTrainer mt) {
+                this.ngram = ngram;
+                this.records = records;
+                this.mt = mt;
+	    }
+
+	    public void run() {
+		this.model = new MultinomialDocumentModel(new String(""+this.ngram));
+		//System.out.println("new task"+"recor size "+ this.records.size());
+		for (Record record : this.records) {
+		    
+                    this.model.addDocModel(record.getId(), mt.returnTokens(record.getText(), this.ngram),
+                                   record.getTextcategory());
+		}
+             
+	    }
+            public MultinomialDocumentModel get() {
+                return this.model;
+            }
+            
 	}
 
 	public List<MultinomialDocumentModel> populateModels(List<Record> records)
 			throws IOException {
-		List<MultinomialDocumentModel> models = new ArrayList<MultinomialDocumentModel>();
-
+		java.util.Vector<MultinomialDocumentModel> models = new java.util.Vector<MultinomialDocumentModel>();
+		java.util.Vector<FutureTask<MultinomialDocumentModel>> tasks = new java.util.Vector<FutureTask<MultinomialDocumentModel>>();
+		ExecutorService exs = Executors.newCachedThreadPool();
 		for (int ngram : this.ngramsToGet) {
-			MultinomialDocumentModel md = new MultinomialDocumentModel(
-					new String("" + ngram));
-			for (Record record : records) {
-				md.addDocModel(record.getId(),
-						this.returnTokens(record.getText(), ngram),
-						record.getTextcategory());
-			}
-			models.add(md);
+		    DocumentModel ft = new DocumentModel(ngram, records, this);
+		    MultinomialDocumentModel md;
+		    tasks.add(exs.submit(ft, md));
 		}
-		return models;
+		int count = 0;
+		//System.out.println("num tasks "+ tasks.size());
+                while (count < tasks.size()) {
+  		    for (Future<MultinomialDocumentModel> ft : tasks) {
+		      
+                       if (ft.isDone()) {
+			  count++;
+                          models.add(ft.get());
+			  //	  System.out.println("done");
+		       }
+		 
+		    }
+		}
+		System.out.println("done with populatin"+ "models size "+ models.size());
+		exs.shutdownNow();
+		return  models;
 	}
 
 	public Instance testInstanceOnLanguageModel(List<Record> records,
@@ -1259,7 +1303,7 @@ public class MedicalTrainer extends Object {
 	public void doLanguageModelWithSampling(int samplesize, int numtime)
 			throws Exception {
 		ArrayList<Float> result = new ArrayList<Float>();
-		 CSVWriter cv = new CSVWriter(new FileWriter("/home/ashwani/xyz/run100-M-detailout.csv"));
+		 CSVWriter cv = new CSVWriter(new FileWriter("/usa/arao/xyz/run100-M-detailout.csv"));
 		for (int i = 0; i < numtime; i++) {
 			List<?> objs = Sampling.sampleWithoutReplacement(this.population,
 					samplesize);
@@ -1334,11 +1378,13 @@ public class MedicalTrainer extends Object {
 							+ testinstance);
 				}
 			} else {
+			    System.out.println("contin suize "+container.size());
 				List<Vector> trainset = this.mahoutTrainingSetOnLanguageModel(
 						records, container, docid);
 
 				ArrayList<Record> testrecord = new ArrayList<Record>();
 				testrecord.add(record);
+				
 				List<Vector> testset = this.mahoutTrainingSetOnLanguageModel(
 						testrecord, container, null);
 				double[] predictedProb = new double[1];
