@@ -4,4 +4,7 @@ bin
 src/heritage
 build
 nohup.out
+dist
+200results.txt
+300results.txt 
 file:
