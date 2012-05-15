@@ -14,6 +14,12 @@ import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.StopAnalyzer;
 import org.apache.lucene.util.Version;
 
+import cchs.CounterComparison;
+
+
+import edu.stanford.nlp.stats.Counter;
+import edu.stanford.nlp.stats.IntCounter;
+
 /**
  * @author ashwani
  *
@@ -78,4 +84,41 @@ public final class StopWordList {
 	public static void removeFromMedicalStopList(String toRemove) {
 		StopWordList.medicalWords.remove(toRemove);
 	}
+	
+	public static boolean acceptInput(List<String> input) {
+		Counter<String> inputCounter = new IntCounter<String>();
+		for (String in : input)
+			inputCounter.incrementCount(in);
+		for (Counter<String> cnt :  StopWordList.getCounterToFilter()) {
+			if (CounterComparison.areEqual(cnt, inputCounter))
+				return false;
+		}
+		return true;
+	}
+		
+	public static List<Counter<String>>  getCounterToFilter() {
+		ArrayList<Counter<String>> counters = new ArrayList<Counter<String>>();
+		Counter<String> breast = new IntCounter<String>();
+		breast.incrementCount("breast");
+		counters.add(breast);
+			
+		Counter<String> bottleuseenfamillipil = new IntCounter<String>();
+		bottleuseenfamillipil.incrementCount("bottle");
+		bottleuseenfamillipil.incrementCount("use");
+		bottleuseenfamillipil.incrementCount("enfamil");
+		bottleuseenfamillipil.incrementCount("lipil");
+		counters.add(bottleuseenfamillipil);
+			
+		Counter<String> breastandbottleuseenfamillipil = new IntCounter<String>();
+		breastandbottleuseenfamillipil.incrementCount("breast");
+		breastandbottleuseenfamillipil.incrementCount("and");
+	    breastandbottleuseenfamillipil.incrementCount("bottle");
+		breastandbottleuseenfamillipil.incrementCount("use");
+		breastandbottleuseenfamillipil.incrementCount("enfamil");
+		breastandbottleuseenfamillipil.incrementCount("lipil");
+		counters.add(breastandbottleuseenfamillipil);
+			
+		return counters;
+	}
+
 }
