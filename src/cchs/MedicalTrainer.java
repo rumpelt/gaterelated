@@ -5,11 +5,6 @@ package cchs;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ExecutorService;
-import java.lang.Runnable;
-import java.util.concurrent.FutureTask;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -83,16 +78,23 @@ import weka.core.Instances;
 public class MedicalTrainer extends Object {
 	private static Options options = new Options();
 	private List<Record> population = null;
-  
+
 	private String[] cloptions;
 	private ClassifierType cltype;
 	private boolean languageModel = false;
 	private int minngram = -1;
-        private int samplesize;
-        private int numIteration;
+	private int samplesize;
+	private int numIteration;
+	private boolean removeCommonCounters=false;
+
 	private static void addOptions() {
-	        options.addOption("samplesize","samplesize",true,"samplesize to work on");
-		options.addOption("numi","numi",true,"num iterations to perform");
+		
+		options.addOption("removeCommonCounters", "removeCommonCounters", false,
+		"if this option is present the remove highly frequent counters from the model");
+		
+		options.addOption("samplesize", "samplesize", true,
+				"samplesize to work on");
+		options.addOption("numi", "numi", true, "num iterations to perform");
 		options.addOption("minngram", "minngram", true,
 				"the min ngram for ngram tokenizer"
 						+ "the minngram for ngram tokemizer");
@@ -238,14 +240,14 @@ public class MedicalTrainer extends Object {
 			if (this.removesinglecount)
 				termspace = KLDivergence.removeSingleCounteTerms(termspace);
 			this.trainingSet = this.returnIndicatorVectorOfTermSpace(
-					termspace.keySet(), true);
+					termspace.keySet(), true, this.removeCommonCounters);
 		}
 		if (this.predict) {
 			this.classifier = CommonClassifierRoutines.trainOnInstances(
 					classifier, this.trainingSet, this.indicesToRemove,
 					this.classifieroptions);
 			WekaInstances testingSet = this.returnIndicatorVectorOfTermSpace(
-					termspace.keySet(), false);
+					termspace.keySet(), false, this.removeCommonCounters);
 			testingSet.setClassMissingForEachInstance();
 		} else if (this.eval)
 			this.evaluate();
@@ -277,10 +279,15 @@ public class MedicalTrainer extends Object {
 		MedicalTrainer mt = new MedicalTrainer();
 		CommandLineParser cmdLineGnuParser = new GnuParser();
 		CommandLine command = cmdLineGnuParser.parse(options, commandargs);
+		
+		if (command.hasOption("removeCommonCounters"))
+			mt.removeCommonCounters = true;
+		
 		if (command.hasOption("samplesize"))
-		    mt.samplesize = Integer.parseInt(command.getOptionValue("samplesize"));
-		if(command.hasOption("numi"))
-		    mt.numIteration = Integer.parseInt(command.getOptionValue("numi"));
+			mt.samplesize = Integer.parseInt(command
+					.getOptionValue("samplesize"));
+		if (command.hasOption("numi"))
+			mt.numIteration = Integer.parseInt(command.getOptionValue("numi"));
 		if (command.hasOption("minngram"))
 			mt.minngram = Integer.parseInt(command.getOptionValue("minngram"));
 
@@ -702,7 +709,7 @@ public class MedicalTrainer extends Object {
 	 * @throws IOException
 	 */
 	public WekaInstances returnIndicatorVectorOfTermSpace(
-			Set<String> termspace, boolean doNotAddUnkownClass)
+			Set<String> termspace, boolean doNotAddUnkownClass , boolean removeCommonCounters)
 			throws NumberFormatException, IOException {
 		int numattributes = 0;
 		if (termspace != null)
@@ -768,7 +775,7 @@ public class MedicalTrainer extends Object {
 			// System.out.println(nextLine[identifierCol-1]+" "+ age);
 			for (int ngram : this.ngramsToGet) {
 				Set<String> terms = this
-						.returnUniqueNgramTermspace(text, ngram);
+						.returnUniqueNgramTermspace(text, ngram, removeCommonCounters);
 				if (termspace != null) {
 					for (String t : terms) {
 						if (termspace.contains(t))
@@ -794,7 +801,7 @@ public class MedicalTrainer extends Object {
 		return wekainstances;
 	}
 
-	public List<String> returnTokens(String input, int ngram) {
+	public List<String> returnTokens(String input, int ngram, boolean removeCommonCounters) {
 		List<String> terms = new ArrayList<String>();
 		List<String> temptokens = MedicalTrainer.ptbTokenizer(input);
 
@@ -818,7 +825,8 @@ public class MedicalTrainer extends Object {
 			MedicalTrainer.simpleStem(tokens);
 		if (this.stopwordlist)
 			tokens = MedicalTrainer.removeStopWords(tokens);
-
+		if (removeCommonCounters && !StopWordList.acceptInput(tokens))
+			return null;
 		if (ngram == 1)
 			return tokens;
 		if (this.minngram == -1)
@@ -834,9 +842,10 @@ public class MedicalTrainer extends Object {
 		return terms.size() > 0 ? terms : null;
 	}
 
-	public HashSet<String> returnUniqueNgramTermspace(String input, int ngram) {
+	public HashSet<String> returnUniqueNgramTermspace(String input, int ngram , 
+			boolean removeCommonCounters) {
 		LinkedHashSet<String> uniqueTerms = new LinkedHashSet<String>();
-		List<String> tokens = this.returnTokens(input, ngram);
+		List<String> tokens = this.returnTokens(input, ngram, removeCommonCounters);
 		for (String toks : tokens) {
 			uniqueTerms.add(toks);
 		}
@@ -891,7 +900,7 @@ public class MedicalTrainer extends Object {
 				if (nextLine[this.textcol - 1].length() <= 0)
 					continue;
 				String input = nextLine[this.textcol - 1];
-				List<String> tokens = this.returnTokens(input, ngram);
+				List<String> tokens = this.returnTokens(input, ngram, this.removeCommonCounters);
 				for (String tok : tokens) {
 					uniqueTerms.add(tok);
 				}
@@ -939,7 +948,8 @@ public class MedicalTrainer extends Object {
 	public Counter<String> returnFreqDist(String string, int ngram,
 			boolean tolowercase, boolean stem, Set<?> stopwordlist) {
 		Counter<String> cntr = new IntCounter<String>();
-		MedicalTrainer.addToCounter(cntr, this.returnTokens(string, ngram));
+		
+		MedicalTrainer.addToCounter(cntr, this.returnTokens(string, ngram, false));
 		return cntr;
 	}
 
@@ -984,7 +994,7 @@ public class MedicalTrainer extends Object {
 					continue;
 			}
 			String input = nextLine[this.textcol - 1];
-			List<String> tokens = this.returnTokens(input, ngramsToget);
+			List<String> tokens = this.returnTokens(input, ngramsToget, false);
 			MedicalTrainer.addToCounter(cntr, tokens);
 		}
 		return cntr;
@@ -1015,7 +1025,7 @@ public class MedicalTrainer extends Object {
 
 	public void evaluate() throws Exception {
 		/*
-	        * if (this.cltype.equals(ClassifierType.simplelogistic)) { Enumeration
+		 * if (this.cltype.equals(ClassifierType.simplelogistic)) { Enumeration
 		 * enm = ((SimpleLogistic)this.classifier).enumerateMeasures();
 		 * while(enm.hasMoreElements()) System.out.println(enm.nextElement()); }
 		 */
@@ -1049,25 +1059,25 @@ public class MedicalTrainer extends Object {
 						.println("don't want you to be here method  : getDocIds");
 		}
 		return docs;
-	
-        }
 
-       
+	}
 
 	public List<MultinomialDocumentModel> populateModels(List<Record> records)
 			throws IOException {
 		java.util.Vector<MultinomialDocumentModel> models = new java.util.Vector<MultinomialDocumentModel>();
-		
+
 		for (int ngram : this.ngramsToGet) {
-		    MultinomialDocumentModel md = new MultinomialDocumentModel(new String(""+ngram));
-		    for(Record record : records) {
-			md.addDocModel(record.getId(), this.returnTokens(record.getText(), ngram),
-					record.getTextcategory());
-                    }
-		    models.add(md);
+			MultinomialDocumentModel md = new MultinomialDocumentModel(
+					new String("" + ngram));
+			for (Record record : records) {
+				md.addDocModel(record.getId(),
+						this.returnTokens(record.getText(), ngram, this.removeCommonCounters),
+						record.getTextcategory());
+			}
+			models.add(md);
 		}
-		
-		return  models;
+
+		return models;
 	}
 
 	public Instance testInstanceOnLanguageModel(List<Record> records,
@@ -1094,11 +1104,11 @@ public class MedicalTrainer extends Object {
 			for (MultinomialDocumentModel md : containers) {
 				List<String> X = null;
 				if (md.getModelName().equalsIgnoreCase("1"))
-					X = this.returnTokens(text, 1);
+					X = this.returnTokens(text, 1, this.removeCommonCounters);
 				else if (md.getModelName().equalsIgnoreCase("2"))
-					X = this.returnTokens(text, 2);
+					X = this.returnTokens(text, 2,  this.removeCommonCounters);
 				else if (md.getModelName().equalsIgnoreCase("3"))
-					X = this.returnTokens(text, 3);
+					X = this.returnTokens(text, 3,  this.removeCommonCounters);
 				for (String topic : unitopics) {
 					String attname = topic + "_" + md.getModelName();
 					instances.setValueOfWorkingInstance(attname,
@@ -1127,9 +1137,18 @@ public class MedicalTrainer extends Object {
 			float age = Float.parseFloat(row[this.agecol - 1]);
 			if (age < this.lowageval || age > this.upageval)
 				continue;
-			if (row.length < this.labelcol
-					|| row[this.labelcol - 1].trim().length() <= 0)
+			// if labelcol is -1 or less than 0 then all rows of the csv file
+			// will beprocessed
+			if (this.labelcol > 0
+					&& (row.length < this.labelcol || row[this.labelcol - 1]
+							.trim().length() <= 0))
 				continue;
+			
+			if (this.removeCommonCounters &&
+					this.returnTokens(row[this.textcol - 1].trim(),
+							1, this.removeCommonCounters) == null)
+					continue;
+			
 			String id = row[this.identifierCol - 1].trim();
 			Record record = null;
 			if (!ids.contains(id))
@@ -1141,7 +1160,10 @@ public class MedicalTrainer extends Object {
 
 			record.setAge(age);
 			record.setText(row[this.textcol - 1].trim());
-			record.setTextcategory(row[this.labelcol - 1].trim());
+			if (this.labelcol > 0) 				
+				record.setTextcategory(row[this.labelcol - 1].trim());
+			else
+				record.setTextcategory("NA");
 			ids.add(record.getId());
 			this.population.add(record);
 		}
@@ -1188,11 +1210,11 @@ public class MedicalTrainer extends Object {
 			for (MultinomialDocumentModel md : containers) {
 				List<String> X = null;
 				if (md.getModelName().equalsIgnoreCase("1"))
-					X = this.returnTokens(record.getText(), 1);
+					X = this.returnTokens(record.getText(), 1,  this.removeCommonCounters);
 				else if (md.getModelName().equalsIgnoreCase("2"))
-					X = this.returnTokens(record.getText(), 2);
+					X = this.returnTokens(record.getText(), 2,  this.removeCommonCounters);
 				else if (md.getModelName().equalsIgnoreCase("3"))
-					X = this.returnTokens(record.getText(), 3);
+					X = this.returnTokens(record.getText(), 3,  this.removeCommonCounters);
 				for (String topic : unitopics) {
 					val[index++] = md.getProbOfClassGivenDocument(X, topic);
 				}
@@ -1245,11 +1267,11 @@ public class MedicalTrainer extends Object {
 			for (MultinomialDocumentModel md : containers) {
 				List<String> X = null;
 				if (md.getModelName().equalsIgnoreCase("1"))
-					X = this.returnTokens(record.getText(), 1);
+					X = this.returnTokens(record.getText(), 1,  this.removeCommonCounters);
 				else if (md.getModelName().equalsIgnoreCase("2"))
-					X = this.returnTokens(record.getText(), 2);
+					X = this.returnTokens(record.getText(), 2,  this.removeCommonCounters);
 				else if (md.getModelName().equalsIgnoreCase("3"))
-					X = this.returnTokens(record.getText(), 3);
+					X = this.returnTokens(record.getText(), 3,  this.removeCommonCounters);
 				for (String topic : unitopics) {
 					String attname = topic + "_" + md.getModelName();
 					// System.out.println(count);
@@ -1280,11 +1302,12 @@ public class MedicalTrainer extends Object {
 			for (Object o : objs)
 				records.add((Record) o);
 
-		//	this.debugLanguageModel(records, "/home/ashwani/Desktop/debugtri");
+			//this.debugLanguageModel(records,
+				//	"/home/ashwani/dustbin/debugtri-all.csv");
 			String[] row = new String[2];
 			row[0] = "" + records.size();
-			 row[1] = ""+this.doLanguageModelClassification(records, cv);
-		//	 cv.writeNext(row);
+			row[1] = ""+this.doLanguageModelClassification(records, cv);
+			cv.writeNext(row);
 		}
 		cv.close();
 		System.out.println(result);
@@ -1292,26 +1315,27 @@ public class MedicalTrainer extends Object {
 
 	public void debugLanguageModel(List<Record> records, String fileName)
 			throws IOException {
-		List<MultinomialDocumentModel> container = 
-			this.populateModels(records);
+		List<MultinomialDocumentModel> container = this.populateModels(records);
 		FileWriter fw = new FileWriter(new File(fileName));
-		
+
 		for (MultinomialDocumentModel md : container) {
-			fw.write(md.toString());
+			// fw.write(md.toString());
+			fw.write(md.printGlobalCounter(false));
 		}
-		
+
 		fw.close();
 	}
 
-	public float doLanguageModelClassification(List<Record> records, CSVWriter csvwriter)
-			throws Exception {
+	
+	public float doLanguageModelClassification(List<Record> records,
+			CSVWriter csvwriter) throws Exception {
 		List<MultinomialDocumentModel> container = this.populateModels(records);
 
 		int missclassifier = 0;
 		int count = 0;
 		boolean weka = false;
-		//WekaInstances arff = this.trainingOnLanguageModel(records, container,
-		//		null);
+		// WekaInstances arff = this.trainingOnLanguageModel(records, container,
+		// null);
 		// if (this.dumparff != null)
 		// WekaRoutines.dumpArff(this.dumparff, arff);
 		for (Record record : records) {
@@ -1347,13 +1371,13 @@ public class MedicalTrainer extends Object {
 							+ testinstance);
 				}
 			} else {
-			    //System.out.println("contin suize "+container.size());
+				// System.out.println("contin suize "+container.size());
 				List<Vector> trainset = this.mahoutTrainingSetOnLanguageModel(
 						records, container, docid);
 
 				ArrayList<Record> testrecord = new ArrayList<Record>();
 				testrecord.add(record);
-				
+
 				List<Vector> testset = this.mahoutTrainingSetOnLanguageModel(
 						testrecord, container, null);
 				double[] predictedProb = new double[1];
@@ -1363,33 +1387,36 @@ public class MedicalTrainer extends Object {
 						true,
 						LogisticRegression.trainOnVector(trainset,
 								unitopics.size() * container.size(),
-								unitopics.size(), true, 10), false, predictedProb);
+								unitopics.size(), true, 10), false,
+						predictedProb);
 				if (result == 0) {
 					missclassifier++;
 					if (csvwriter != null) {
-						// output -1 for class label in vector, + 1 for missclassfication
+						// output -1 for class label in vector, + 1 for
+						// missclassfication
 						// + 1 for predicted class probability +1 for id
-						String[] output = new String[test.size() -1 + 1 + 1 + 1];
-						short ind=0;
+						String[] output = new String[test.size() - 1 + 1 + 1
+								+ 1];
+						short ind = 0;
 						output[ind++] = record.getId();
 						output[ind++] = "0";
-						output[ind++] = ""+predictedProb[0];
-						for (int index = 0; index < test.size() -1 ; index++)
-							output[ind++] = ""+ test.get(index);
+						output[ind++] = "" + predictedProb[0];
+						for (int index = 0; index < test.size() - 1; index++)
+							output[ind++] = "" + test.get(index);
 						csvwriter.writeNext(output);
-						}
-				}
-				else {
-					// output -1 for class label in vector, + 1 for missclassfication
-					// + 1 for predicted class probability +1 for id 
-					String[] output = new String[test.size() -1 + 1 + 1+1 ];
+					}
+				} else {
+					// output -1 for class label in vector, + 1 for
+					// missclassfication
+					// + 1 for predicted class probability +1 for id
+					String[] output = new String[test.size() - 1 + 1 + 1 + 1];
 					if (csvwriter != null) {
-						short ind=0;
+						short ind = 0;
 						output[ind++] = record.getId();
 						output[ind++] = "1";
-						output[ind++] = ""+predictedProb[0];
-						for (int index = 0; index < test.size() -1 ; index++)
-							output[ind++] = ""+ test.get(index);
+						output[ind++] = "" + predictedProb[0];
+						for (int index = 0; index < test.size() - 1; index++)
+							output[ind++] = "" + test.get(index);
 						csvwriter.writeNext(output);
 					}
 				}
