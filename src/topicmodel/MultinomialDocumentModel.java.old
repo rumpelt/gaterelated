@@ -16,7 +16,7 @@ import edu.stanford.nlp.stats.IntCounter;
  * 
  * @author ashwani Based on the paper
  */
-public class MultinomialDocumentModel {
+public class  MultinomialDocumentModel{
 	private final String modelName;
 
 	private String tempDocId;
@@ -38,30 +38,6 @@ public class MultinomialDocumentModel {
 				this.docTopicMap.put(docId, this.topicOfTempDoc);
 		}
 
-	}
-	
-	public  IntCounter<String> createGlobalCounter() {
-		IntCounter<String> global = new IntCounter<String>();
-		for (Counter<String> eachcounter : this.docCounters.values()) {
-			global.addAll(eachcounter);
-		}
-		return global;
-	}
-	
-	public String printGlobalCounter(boolean ascending) {
-		IntCounter<String> global = this.createGlobalCounter();
-		StringBuilder sb = new StringBuilder();
-		
-		for (int count=0; count < global.keySet().size(); count++) {
-			String key;
-			if (!ascending)
-			    key = global.argmax();
-			else
-				key = global.argmin();			
-			sb.append(key + ","+ global.getCount(key)+"\n");			
-			global.remove(key);
-		}
-		return sb.toString();
 	}
 
 	/**
