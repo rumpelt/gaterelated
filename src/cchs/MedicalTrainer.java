@@ -86,9 +86,10 @@ public class MedicalTrainer extends Object {
 	private int samplesize;
 	private int numIteration;
 	private boolean removeCommonCounters=false;
-
+    private boolean tournament=false;
 	private static void addOptions() {
-		
+	    options.addOption("tournament","tournament",false, "do a tournament between models, You can use various modele and" +
+                "make the decision based on the majority of the model");
 		options.addOption("removeCommonCounters", "removeCommonCounters", false,
 		"if this option is present the remove highly frequent counters from the model");
 		
@@ -278,8 +279,10 @@ public class MedicalTrainer extends Object {
 		MedicalTrainer.addOptions();
 		MedicalTrainer mt = new MedicalTrainer();
 		CommandLineParser cmdLineGnuParser = new GnuParser();
+
 		CommandLine command = cmdLineGnuParser.parse(options, commandargs);
-		
+                if (command.hasOption("tournament"))
+		    mt.tournament = true;		
 		if (command.hasOption("removeCommonCounters"))
 			mt.removeCommonCounters = true;
 		
@@ -1326,7 +1329,40 @@ public class MedicalTrainer extends Object {
 		fw.close();
 	}
 
+    public int doTournament(Vector input , List<String> topics, int nummodels) {
+	int numtopics = topics.size();
+        int[] modelwinners = new int[nummodels];
+	int presentmodelnum = 0;
+	int topicindex = 0;
+	int classindex = 0;
+	int numtopics = topics.size();
+	double max = 0;
+	for (int count = 0; count < numtopics * nummodels; count++ ) {
+	   
+	    if(input.get(count) > max) {
+		max = input.get(count);
+		winner = topicindex;
+	    }
+	    
+	    if (((count + 1) % numtopis) == 0){
+		topicindex = 0;
+	        max = 0;
+		modelwinners[presentmodelnum] = winner;
+		presentmodelnum++;
+		
+	    }
+	    else
+		topicindex++;   
+	}
+	IntCounter<Integer> labelcounter = new IntCounter<Integer>();
+	for(int labelnum : modelwinners) {
+	    labelcounter.incrementCount(labelnum):
+        }
+	if (labelcounter.argmax() == labelcounter.argmin())
+	    return modelwinners[0];
+	return labelcounter.argmax();
 	
+    }
 	public float doLanguageModelClassification(List<Record> records,
 			CSVWriter csvwriter) throws Exception {
 		List<MultinomialDocumentModel> container = this.populateModels(records);
@@ -1392,16 +1428,16 @@ public class MedicalTrainer extends Object {
 				if (result == 0) {
 					missclassifier++;
 					if (csvwriter != null) {
-						// output -1 for class label in vector, + 1 for
-						// missclassfication
+						// + 1 for  missclassfication
 						// + 1 for predicted class probability +1 for id
-						String[] output = new String[test.size() - 1 + 1 + 1
+					    // also has the actual class label at the end
+						String[] output = new String[test.size()  + 1 + 1
 								+ 1];
 						short ind = 0;
 						output[ind++] = record.getId();
 						output[ind++] = "0";
 						output[ind++] = "" + predictedProb[0];
-						for (int index = 0; index < test.size() - 1; index++)
+						for (int index = 0; index < test.size() ; index++)
 							output[ind++] = "" + test.get(index);
 						csvwriter.writeNext(output);
 					}
