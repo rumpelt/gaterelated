@@ -11,5 +11,8 @@ public enum ClassifierType {
 j48,
 simplelogistic,
 logistic,
-adaboost
+adaboost,
+mahoutOnlineLogisticRegression,
+tournamentmodel,
+wekaclassifiers
 }

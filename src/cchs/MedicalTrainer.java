@@ -86,10 +86,9 @@ public class MedicalTrainer extends Object {
 	private int samplesize;
 	private int numIteration;
 	private boolean removeCommonCounters=false;
-    private boolean tournament=false;
+    
 	private static void addOptions() {
-	    options.addOption("tournament","tournament",false, "do a tournament between models, You can use various modele and" +
-                "make the decision based on the majority of the model");
+	 
 		options.addOption("removeCommonCounters", "removeCommonCounters", false,
 		"if this option is present the remove highly frequent counters from the model");
 		
@@ -281,8 +280,7 @@ public class MedicalTrainer extends Object {
 		CommandLineParser cmdLineGnuParser = new GnuParser();
 
 		CommandLine command = cmdLineGnuParser.parse(options, commandargs);
-                if (command.hasOption("tournament"))
-		    mt.tournament = true;		
+		
 		if (command.hasOption("removeCommonCounters"))
 			mt.removeCommonCounters = true;
 		
@@ -1310,7 +1308,7 @@ public class MedicalTrainer extends Object {
 			String[] row = new String[2];
 			row[0] = "" + records.size();
 			row[1] = ""+this.doLanguageModelClassification(records, cv);
-			cv.writeNext(row);
+			//cv.writeNext(row);
 		}
 		cv.close();
 		System.out.println(result);
@@ -1334,9 +1332,8 @@ public class MedicalTrainer extends Object {
         int[] modelwinners = new int[nummodels];
 	int presentmodelnum = 0;
 	int topicindex = 0;
-	int classindex = 0;
-	int numtopics = topics.size();
 	double max = 0;
+	int winner = -1;
 	for (int count = 0; count < numtopics * nummodels; count++ ) {
 	   
 	    if(input.get(count) > max) {
@@ -1344,21 +1341,20 @@ public class MedicalTrainer extends Object {
 		winner = topicindex;
 	    }
 	    
-	    if (((count + 1) % numtopis) == 0){
-		topicindex = 0;
-	        max = 0;
-		modelwinners[presentmodelnum] = winner;
-		presentmodelnum++;
-		
+	    if (((count + 1) % numtopics) == 0){
+	    	topicindex = 0;
+	    	max = 0;
+	    	modelwinners[presentmodelnum] = winner;
+	    	presentmodelnum++;		
 	    }
 	    else
 		topicindex++;   
 	}
 	IntCounter<Integer> labelcounter = new IntCounter<Integer>();
 	for(int labelnum : modelwinners) {
-	    labelcounter.incrementCount(labelnum):
+	    labelcounter.incrementCount(labelnum);
         }
-	if (labelcounter.argmax() == labelcounter.argmin())
+	if (labelcounter.getCount(labelcounter.argmax()) == labelcounter.getCount(labelcounter.argmin()))
 	    return modelwinners[0];
 	return labelcounter.argmax();
 	
@@ -1390,7 +1386,7 @@ public class MedicalTrainer extends Object {
 			}
 			Collections.sort(unitopics);
 
-			if (weka) {
+			if (this.cltype.equals(ClassifierType.wekaclassifiers)) {
 				WekaInstances training = this.trainingOnLanguageModel(records,
 						container, docid);
 				AbstractClassifier classifier = CommonClassifierRoutines
@@ -1406,16 +1402,17 @@ public class MedicalTrainer extends Object {
 					System.out.println("missclassified " + docid + " "
 							+ testinstance);
 				}
-			} else {
+			} else if (this.cltype.equals(ClassifierType.mahoutOnlineLogisticRegression)){
 				// System.out.println("contin suize "+container.size());
+				ArrayList<Record> testrecord = new ArrayList<Record>();
+				testrecord.add(record);
+				List<Vector> testset = this.mahoutTrainingSetOnLanguageModel(
+						testrecord, container, null);
+				
 				List<Vector> trainset = this.mahoutTrainingSetOnLanguageModel(
 						records, container, docid);
 
-				ArrayList<Record> testrecord = new ArrayList<Record>();
-				testrecord.add(record);
-
-				List<Vector> testset = this.mahoutTrainingSetOnLanguageModel(
-						testrecord, container, null);
+				
 				double[] predictedProb = new double[1];
 				Vector test = testset.get(0);
 				int result = LogisticRegression.test(
@@ -1445,17 +1442,50 @@ public class MedicalTrainer extends Object {
 					// output -1 for class label in vector, + 1 for
 					// missclassfication
 					// + 1 for predicted class probability +1 for id
-					String[] output = new String[test.size() - 1 + 1 + 1 + 1];
+					String[] output = new String[test.size() + 1  + 1 + 1];
 					if (csvwriter != null) {
 						short ind = 0;
 						output[ind++] = record.getId();
 						output[ind++] = "1";
 						output[ind++] = "" + predictedProb[0];
-						for (int index = 0; index < test.size() - 1; index++)
+						for (int index = 0; index < test.size() ; index++)
 							output[ind++] = "" + test.get(index);
 						csvwriter.writeNext(output);
 					}
 				}
+			}
+			else if (this.cltype.equals(ClassifierType.tournamentmodel)) {
+				ArrayList<Record> testrecord = new ArrayList<Record>();
+				testrecord.add(record);
+				List<Vector> testset = this.mahoutTrainingSetOnLanguageModel(
+						testrecord, container, null);
+				Vector test = testset.get(0);
+				double predicted = this.doTournament(test,
+						unitopics, this.ngramsToGet.size());
+				if (predicted != test.get(test.size() -1)) {
+					missclassifier++;
+					String[] output = new String[test.size() + 1  + 1];
+					if (csvwriter != null) {
+						short ind = 0;
+						output[ind++] = record.getId();
+						output[ind++] = "0";						
+						for (int index = 0; index < test.size(); index++)
+							output[ind++] = "" + test.get(index);
+						csvwriter.writeNext(output);
+					}
+				}
+				else {
+					String[] output = new String[test.size()  + 1  + 1];
+					if (csvwriter != null) {
+						short ind = 0;
+						output[ind++] = record.getId();
+						output[ind++] = "1";						
+						for (int index = 0; index < test.size() ; index++)
+							output[ind++] = "" + test.get(index);
+						csvwriter.writeNext(output);
+					}
+				}
+					
 			}
 			for (MultinomialDocumentModel md : container) {
 				md.restoreDocAndCounters(docid);
