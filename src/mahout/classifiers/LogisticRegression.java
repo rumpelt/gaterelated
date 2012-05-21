@@ -32,11 +32,16 @@ import au.com.bytecode.opencsv.CSVWriter;
 public class LogisticRegression extends OnlineLogisticRegression {
 	
 	private static PriorFunction priorfunction = new L1();
-	
-	public static AbstractOnlineLogisticRegression trainOnVector(
-			List<Vector> input, int numfeatures , int numcategories, 
-			boolean randomSample,
-			int numIteration) {
+
+        /**
+         * Assumes that class label is at the end of the vector.
+         * startindex : specifies the index at which the first input feautrue for training start.
+         * endindex: specifies the index at which the  last input feature for training ends.
+         * So for example if the first input feature is at index 0 then startindex is 0.
+         * If the last inpu feature is at index 7 then endindex will be set to 7.
+         */
+	public static AbstractOnlineLogisticRegression trainOnVector(List<Vector> input, int numfeatures , int numcategories, 
+			boolean randomSample, int startindex, int endindex, int numIteration) {
 		OnlineLogisticRegression ol = new OnlineLogisticRegression(numcategories,
 				numfeatures, LogisticRegression.priorfunction);
 		
@@ -51,22 +56,30 @@ public class LogisticRegression extends OnlineLogisticRegression {
 				 Vector totrain = (Vector)v;
 		//
 			//	 System.out.println(totrain+" : "+(int)totrain.get(totrain.size() -1 ));
-				 ol.train((int)totrain.get(totrain.size() -1 ), totrain.viewPart(0,
-						 totrain.size() -1 ));
+                                 // endindex = endindex + 1 because of the specification of the viewPart call
+				 ol.train((int)totrain.get(totrain.size() -1 ), totrain.viewPart(startindex,
+						 endindex+1));
 			 }
 		}
 		return ol;
 	}
 	
+        /**
+        * Assumes that class label is at the end of the vector.
+	* startindex : specifies the index at which the first input feautrue for training start.
+	* endindex: specifies the index at which the  last input feature for training ends.
+        * So for example if the first input feature is at index 0 then startindex is 0.
+        * If the last inpu feature is at index 7 then endindex will be set to 7.
+        */
 	public static int test(Vector test, boolean categoryPresent,
-			AbstractOnlineLogisticRegression ol, boolean returnClassPrediction,
-			double[] classProb) {
+			       AbstractOnlineLogisticRegression ol, boolean returnClassPrediction, int startindex,
+			       int endindex,  double[] classProb) {
 		int actual = 0;
 		int predicted = 0;
-		//System.out.println("class logisticregression in mahout function : test: "+test);
+   		//System.out.println("class logisticregression in mahout function : test: "+test);
 		if (categoryPresent) {
 			actual = (int) test.get(test.size() -1);
-			test = test.viewPart(0, test.size() -1);
+			test = test.viewPart(startindex, endindex + 1);
 		}
 		Vector result = ol.classify(test);
 		//Matrix m = ol.getBeta();
@@ -88,9 +101,11 @@ public class LogisticRegression extends OnlineLogisticRegression {
 			return (actual == predicted) ? 1 : 0;		
 	}
 	/**
+         * Do not use this routine. Broken and bad.
 	 * remove some of the indices
 	 * @param input
 	 */
+        @Deprecated
 	public static void doLeaveOneOutCrossValidation(List<Vector> input,
 			String csvfile){
 		List<Vector> actual  = null;

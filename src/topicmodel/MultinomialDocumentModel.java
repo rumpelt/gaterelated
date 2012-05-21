@@ -315,7 +315,7 @@ public class MultinomialDocumentModel {
 			double termProb = this.getProbabilityOfWordGivenClass(term,
 					topicName, vocab);
 			termProb = Math.pow(termProb, termCount);
-			termProb = termProb / factorial((int) termCount);
+		        termProb = termProb / factorial((int) termCount);
 			prob = prob * termProb;
 		}
 		prob = factorial((int) counter.totalCount()) * prob;

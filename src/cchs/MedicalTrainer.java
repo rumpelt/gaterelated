@@ -1203,7 +1203,7 @@ public class MedicalTrainer extends Object {
 			 * label
 			 */
 			Vector dv = new DenseVector(
-					(containers.size() * unitopics.size()) + 1);
+						    (containers.size() * unitopics.size()) + 1);
 			double[] val = new double[(containers.size() * unitopics.size()) + 1];
 			// output.put(record.getId(), record.getAge());
 			// output.put(record.getId(), dv) ;
@@ -1364,6 +1364,7 @@ public class MedicalTrainer extends Object {
 		List<MultinomialDocumentModel> container = this.populateModels(records);
 
 		int missclassifier = 0;
+
 		int count = 0;
 		boolean weka = false;
 		// WekaInstances arff = this.trainingOnLanguageModel(records, container,
@@ -1385,7 +1386,7 @@ public class MedicalTrainer extends Object {
 				}
 			}
 			Collections.sort(unitopics);
-
+                        int numfeatures = unitopics.size() * container.size();
 			if (this.cltype.equals(ClassifierType.wekaclassifiers)) {
 				WekaInstances training = this.trainingOnLanguageModel(records,
 						container, docid);
@@ -1415,13 +1416,10 @@ public class MedicalTrainer extends Object {
 				
 				double[] predictedProb = new double[1];
 				Vector test = testset.get(0);
-				int result = LogisticRegression.test(
-						test,
-						true,
-						LogisticRegression.trainOnVector(trainset,
-								unitopics.size() * container.size(),
-								unitopics.size(), true, 10), false,
-						predictedProb);
+				int result = LogisticRegression.test(test, true,
+						LogisticRegression.trainOnVector(trainset, numfeatures ,
+										 unitopics.size(), true,0, numfeatures -1, 10), false, 0, 
+                                                                                     numfeatures -1, predictedProb);
 				if (result == 0) {
 					missclassifier++;
 					if (csvwriter != null) {

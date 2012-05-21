@@ -120,5 +120,5 @@ public final class StopWordList {
 			
 		return counters;
 	}
-
+    
 }
