@@ -6,5 +6,6 @@ build
 nohup.out
 dist
 200results.txt
+temp
 300results.txt 
 file:

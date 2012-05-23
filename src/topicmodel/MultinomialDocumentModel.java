@@ -47,6 +47,8 @@ public class MultinomialDocumentModel {
 		}
 		return global;
 	}
+        
+       
 	
 	public String printGlobalCounter(boolean ascending) {
 		IntCounter<String> global = this.createGlobalCounter();
@@ -85,6 +87,30 @@ public class MultinomialDocumentModel {
 	 */
 	private HashMap<String, String> docTopicMap = new HashMap<String, String>();
 
+        public void addModel(MultinomialDocumentModel md) {
+            for (String doc : md.getdocCounters().keySet()) {
+		Counter<String> counter = this.getdocCounters().get(doc);
+		if (counter == null)
+		    this.getdocCounters().put(doc, md.getdocCounters().get(doc));
+		else
+		    counter.addAll(md.getdocCounters().get(doc));
+	    }
+
+	    for (String doc : md.getdocTopicMap().keySet()){
+		if (this.getdocTopicMap().get(doc) == null){
+		    this.getdocTopicMap().put(doc, md.getdocTopicMap().get(doc));
+		}
+            }
+                   	    
+        }
+        
+        public HashMap<String, Counter<String>> getdocCounters() {
+	    return this.docCounters;
+        }
+
+        public HashMap<String, String> getdocTopicMap() {
+	    return this.docTopicMap;
+        }
 	/**
 	 * String representaion of various terms and probabiliites etc. Useful for
 	 * debug purpose. Created this to debug the trigram model.
@@ -121,9 +147,9 @@ public class MultinomialDocumentModel {
 					+ this.documentLikelyhood(docid) + " ");
 			for (String classes : this.getTopics()) {
 				sb.append(" prob of class give doc " + classes + " "
-						+ this.getProbOfClassGivenDocument(docid, classes)
+					  + this.getProbOfClassGivenDocument(docid, classes, false)
 						+ " prob of doc given class "
-						+ this.getProbabilityOfDocGivenClass(docid, classes));
+					  + this.getProbabilityOfDocGivenClass(docid, classes, false));
 			}
 			sb.append("\n");
 			// this.restoreDocAndCounters(docid);
@@ -215,6 +241,36 @@ public class MultinomialDocumentModel {
 		return result;
 	}
 
+    public double getProbOfCompWordGivenClass(String word, String topic, List<String> vocab,
+                                            int prior, boolean useipw) {
+	    double cwordcount = prior;
+	    HashMap<String, Double> topicProb  = new HashMap<String, Double>();
+	    for (String name : this.getTopics()) {
+                topicProb.put(name, this.getClassPriorProbability(name));
+	    }
+	    for (String docId : this.docCounters.keySet()) {
+		String localtopic = this.docTopicMap.get(docId);
+	        if (!topic.equals(localtopic)) { 
+		    if (useipw)
+			cwordcount = cwordcount + 
+			    (this.docCounters.get(docId).getCount(word) / topicProb.get(localtopic));
+		    else
+			cwordcount = cwordcount + this.docCounters.get(docId).getCount(word);
+	        }
+            }
+            double totalcompwordcount = vocab.size();
+	    for (String docId : this.docCounters.keySet()) {
+		String localtopic = this.docTopicMap.get(docId);
+		if (!topic.equals(localtopic)) {
+		    if (useipw)
+                        totalcompwordcount = totalcompwordcount + (this.docCounters.get(docId).totalCount() /
+								   topicProb.get(localtopic));
+                    else
+			totalcompwordcount = totalcompwordcount + this.docCounters.get(docId).totalCount();
+		}
+	    }
+	    return cwordcount / totalcompwordcount;
+         }
 	/**
 	 * 
 	 * P(Wt | Cj) Following refrences learning to classify from text from
@@ -266,9 +322,12 @@ public class MultinomialDocumentModel {
 				.probabilityOf(input.size());
 	}
 
-	public double getProbabilityOfDocGivenClass(String docId, String topicName) {
-
-		double prob = 1.0;
+    public double getProbabilityOfDocGivenClass(String docId, String topicName, boolean uselog) {
+	        double prob;
+	        if (!uselog)
+		    prob = 1.0;
+                else
+		    prob = 0.0;
 		List<String> vocab = new ArrayList<String>();
 
 		for (String key : this.docCounters.keySet()) {
@@ -281,21 +340,37 @@ public class MultinomialDocumentModel {
 			if (termCount == 0.0)
 				continue;
 			double termProb = this.getProbabilityOfWordGivenClass(term,
-					topicName, vocab);
-			termProb = Math.pow(termProb, termCount);
-			termProb = termProb / factorial((int) termCount);
-			prob = prob * termProb;
+									      topicName, vocab);
+		        //double comptermProb = this.getProbOfCompWordGivenClass(term, topicName, vocab, 1, true);
+			//termProb = termProb / comptermProb;
+			if (!uselog) {
+			    termProb = Math.pow(termProb, termCount);
+			    termProb = termProb / factorial((int) termCount);
+			    prob = prob * termProb;
+                        }
+                        else {
+			    termProb = termCount * Math.log(termProb);
+			    termProb = termProb - Math.log(factorial((int) termCount));
+			    prob = prob + termProb;
+                        }
 		}
-		prob = factorial((int) this.docCounters.get(docId).totalCount()) * prob;
+                if(!uselog)
+		    prob = factorial((int) this.docCounters.get(docId).totalCount()) * prob;
+                else
+                    prob = Math.log(factorial((int) this.docCounters.get(docId).totalCount())) + prob;
 		return prob;
 		// return this.probabilityOfDocLenght(docId) * prob;
 	}
 
 	public double getProbabilityOfDocGivenClass(List<String> input,
-			String topicName) {
+						    String topicName, boolean uselog) {
 		if (input == null || input.size() == 0)
 			return 0.0;
-		double prob = 1.0;
+
+		double prob = 0;
+                if (!uselog)
+		    prob = 1.0;
+		
 		List<String> vocab = new ArrayList<String>();
 
 		for (String key : this.docCounters.keySet()) {
@@ -313,17 +388,34 @@ public class MultinomialDocumentModel {
 			if (termCount == 0.0)
 				continue;
 			double termProb = this.getProbabilityOfWordGivenClass(term,
-					topicName, vocab);
-			termProb = Math.pow(termProb, termCount);
-		        termProb = termProb / factorial((int) termCount);
-			prob = prob * termProb;
+									      topicName, vocab);
+
+			//          double comptermProb = this.getProbOfCompWordGivenClass(term, topicName, vocab, 1, true);
+			//termProb = termProb / comptermProb;
+			if (!uselog) {
+			    termProb = Math.pow(termProb, termCount);
+		            termProb = termProb / factorial((int) termCount);
+			    prob = prob * termProb;
+			}
+                         else {
+			    termProb = termCount * Math.log(termProb);
+			    termProb = termProb - Math.log(factorial((int) termCount));
+			    prob = prob + termProb;
+                        }
 		}
-		prob = factorial((int) counter.totalCount()) * prob;
+                if (!uselog)
+		    prob = factorial((int) counter.totalCount()) * prob;
+		else
+		    prob = Math.log(factorial((int) counter.totalCount())) + prob;
 		return prob;
 		// return this.probabilityOfDocLenght(input) * prob;
 	}
-
-	public double documentLikelyhood(List<String> input) {
+    /**
+       false argument passed to getProbabilityOfDocGivenClass method. 
+       look at the paper by mccallum and nigam to calculate the log likelihood.
+   
+     */
+    public double documentLikelyhood(List<String> input) {
 		ArrayList<String> classes = new ArrayList<String>();
 		for (String key : this.docTopicMap.values()) {
 			if (!classes.contains(key))
@@ -332,12 +424,16 @@ public class MultinomialDocumentModel {
 		double result = 0.0;
 		for (String topic : classes) {
 			double classPrior = this.getClassPriorProbability(topic);
-			double docProb = this.getProbabilityOfDocGivenClass(input, topic);
+			double docProb = this.getProbabilityOfDocGivenClass(input, topic, false);
 			result = result + (classPrior * docProb);
 		}
 		return result;
 	}
-
+         /**
+         false argument passed to getProbabilityOfDocGivenClass method. 
+         look at the paper by mccallum and nigam to calculate the log likelihood.
+         
+        */
 	public double documentLikelyhood(String docId) {
 		ArrayList<String> classes = new ArrayList<String>();
 		for (String key : this.docTopicMap.values()) {
@@ -347,33 +443,50 @@ public class MultinomialDocumentModel {
 		double result = 0.0;
 		for (String topic : classes) {
 			double classPrior = this.getClassPriorProbability(topic);
-			double docProb = this.getProbabilityOfDocGivenClass(docId, topic);
+			double docProb = this.getProbabilityOfDocGivenClass(docId, topic, false);
 			result = result + (classPrior * docProb);
 		}
 		return result;
 	}
 
-	public double getProbOfClassGivenDocument(String docId, String topicName) {
+    public double getProbOfClassGivenDocument(String docId, String topicName, boolean uselog) {
 		double classPrior = this.getClassPriorProbability(topicName);
 		double docCondProb = this.getProbabilityOfDocGivenClass(docId,
-				topicName);
+									topicName, uselog);
 		if (docCondProb == 0.0)
 			return 0.0;
-
+		
 		double docLikelyHood = this.documentLikelyhood(docId);
-		return (classPrior / docLikelyHood) * docCondProb;
+		
+                if (!uselog)
+		    return (classPrior / docLikelyHood) * docCondProb;
+                else {
+		    double logdoclikely = 0.0;
+		    if (docLikelyHood != 0.00000000000000)
+			logdoclikely = Math.log(docLikelyHood);	
+		    return Math.log(classPrior) + docCondProb - logdoclikely;
+		}
 	}
 
 	public double getProbOfClassGivenDocument(List<String> input,
-			String topicName) {
+						  String topicName, boolean uselog) {
 		double classPrior = this.getClassPriorProbability(topicName);
 		double docCondProb = this.getProbabilityOfDocGivenClass(input,
-				topicName);
+									topicName, uselog);
 		if (docCondProb == 0.0)
 			return 0.0;
 		double docLikelyHood = this.documentLikelyhood(input);
-		return (classPrior / docLikelyHood) * docCondProb;
-	}
+
+		if (!uselog)
+		    return (classPrior / docLikelyHood) * docCondProb;
+                else {
+		    double logdoclikely = 0.0;
+		    if (docLikelyHood != 0.00000000000000)
+			logdoclikely = Math.log(docLikelyHood);	
+		    return Math.log(classPrior) + docCondProb - logdoclikely;
+		}
+                
+        }
 
 	/**
 	 * learning to classify from text from labeled and unlabeled data (kamal

@@ -1,3 +1,0 @@
-/usa/arao/jar/:.:/usa/arao/jar/*:/usa/arao/projects/gaterelated/dist/lib/*
-20 300
-22 300

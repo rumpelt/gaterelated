@@ -1113,7 +1113,7 @@ public class MedicalTrainer extends Object {
 				for (String topic : unitopics) {
 					String attname = topic + "_" + md.getModelName();
 					instances.setValueOfWorkingInstance(attname,
-							md.getProbOfClassGivenDocument(X, topic));
+									    md.getProbOfClassGivenDocument(X, topic, true));
 				}
 			}
 			instances.setValueOfWorkingInstance("class",
@@ -1217,7 +1217,7 @@ public class MedicalTrainer extends Object {
 				else if (md.getModelName().equalsIgnoreCase("3"))
 					X = this.returnTokens(record.getText(), 3,  this.removeCommonCounters);
 				for (String topic : unitopics) {
-					val[index++] = md.getProbOfClassGivenDocument(X, topic);
+				    val[index++] = md.getProbOfClassGivenDocument(X, topic, true);
 				}
 			}
 			float label = unitopics.indexOf(record.getTextcategory());
@@ -1277,7 +1277,7 @@ public class MedicalTrainer extends Object {
 					String attname = topic + "_" + md.getModelName();
 					// System.out.println(count);
 					instances.setValueOfWorkingInstance(attname,
-							md.getProbOfClassGivenDocument(X, topic));
+									    md.getProbOfClassGivenDocument(X, topic, true));
 				}
 
 			}
@@ -1332,8 +1332,8 @@ public class MedicalTrainer extends Object {
         int[] modelwinners = new int[nummodels];
 	int presentmodelnum = 0;
 	int topicindex = 0;
-	double max = 0;
-	int winner = -1;
+	double max = input.get(0);
+	int winner = 0;
 	for (int count = 0; count < numtopics * nummodels; count++ ) {
 	   
 	    if(input.get(count) > max) {
@@ -1491,7 +1491,7 @@ public class MedicalTrainer extends Object {
 			// System.out.println("done "+docid);
 			count++;
 		}
-		System.out.println(missclassifier + " " + records.size());
+		System.out.println(missclassifier + ", " + records.size());
 		return (float) missclassifier / records.size();
 	}
 }
