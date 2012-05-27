@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import stats.PositionIntCounter;
 
 import edu.stanford.nlp.stats.Counter;
 import edu.stanford.nlp.stats.Distribution;
@@ -20,7 +21,7 @@ public class MultinomialDocumentModel {
 	private final String modelName;
 
 	private String tempDocId;
-	private Counter<String> tempCounterForTempDoc;
+	private PositionIntCounter tempCounterForTempDoc;
 	private String topicOfTempDoc;
 
 	public void storeAndRemoveDoc(String docId) {
@@ -80,7 +81,7 @@ public class MultinomialDocumentModel {
 	/**
 	 * Counter for each of the documents
 	 */
-	private HashMap<String, Counter<String>> docCounters = new HashMap<String, Counter<String>>();
+	private HashMap<String, PositionIntCounter> docCounters = new HashMap<String, PositionIntCounter>();
 
 	/**
 	 * Mapping from each of the document to actual topic it was assigned
@@ -104,7 +105,7 @@ public class MultinomialDocumentModel {
                    	    
         }
         
-        public HashMap<String, Counter<String>> getdocCounters() {
+        public HashMap<String, PositionIntCounter> getdocCounters() {
 	    return this.docCounters;
         }
 
@@ -182,17 +183,15 @@ public class MultinomialDocumentModel {
 		if (input == null || input.size() <= 0)
 			return;
 
-		Counter<String> counter = new IntCounter<String>();
-		for (String term : input) {
-			counter.incrementCount(term);
-		}
-
+		PositionIntCounter counter = new PositionIntCounter();
+		counter.addAll(input);
+		
 		if (counter.totalCount() > 0.0) {
 			this.docCounters.put(docId, counter);
 			if (topicName != null)
 				this.docTopicMap.put(docId, topicName);
 		}
-
+		
 	}
 
 	public void addDocTopic(String docId, String topicName) {
@@ -204,7 +203,7 @@ public class MultinomialDocumentModel {
 		this.docTopicMap.put(docid, topic);
 	}
 
-	public void addCounter(String docid, Counter<String> counter) {
+	public void addCounter(String docid, PositionIntCounter counter) {
 		if (counter != null && counter.size() > 0)
 			this.docCounters.put(docid, counter);
 	}
@@ -217,11 +216,10 @@ public class MultinomialDocumentModel {
 	public void addCounter(String docid, List<String> input) {
 		if (input == null || input.size() <= 0)
 			return;
-		Counter<String> counter = new IntCounter<String>();
-		for (String string : input) {
-			counter.incrementCount(string);
-		}
-		if (counter.keySet().size() > 0)
+		PositionIntCounter counter = new PositionIntCounter();
+        counter.addAll(input);
+		
+        if (counter.keySet().size() > 0)
 			this.docCounters.put(docid, counter);
 	}
 
@@ -348,11 +346,16 @@ public class MultinomialDocumentModel {
 			    termProb = termProb / factorial((int) termCount);
 			    prob = prob * termProb;
                         }
-                        else {
+            else {
+            	
+            	if (Double.isNaN(Math.log(termProb)))
+             		termProb = 0;
+             	else
+             		termProb = termCount * Math.log(termProb);
 			    termProb = termCount * Math.log(termProb);
 			    termProb = termProb - Math.log(factorial((int) termCount));
 			    prob = prob + termProb;
-                        }
+            }
 		}
                 if(!uselog)
 		    prob = factorial((int) this.docCounters.get(docId).totalCount()) * prob;
@@ -366,13 +369,11 @@ public class MultinomialDocumentModel {
 						    String topicName, boolean uselog) {
 		if (input == null || input.size() == 0)
 			return 0.0;
-
 		double prob = 0;
-                if (!uselog)
-		    prob = 1.0;
-		
+        if (!uselog)
+		   prob = 1.0;
 		List<String> vocab = new ArrayList<String>();
-
+		
 		for (String key : this.docCounters.keySet()) {
 			for (String term : this.docCounters.get(key).keySet())
 				if (!vocab.contains(term))
@@ -382,33 +383,32 @@ public class MultinomialDocumentModel {
 		for (String text : input) {
 			counter.incrementCount(text);
 		}
-
+		
 		for (String term : vocab) {
 			double termCount = counter.getCount(term);
 			if (termCount == 0.0)
 				continue;
 			double termProb = this.getProbabilityOfWordGivenClass(term,
 									      topicName, vocab);
-
-			//          double comptermProb = this.getProbOfCompWordGivenClass(term, topicName, vocab, 1, true);
-			//termProb = termProb / comptermProb;
 			if (!uselog) {
 			    termProb = Math.pow(termProb, termCount);
-		            termProb = termProb / factorial((int) termCount);
+		        termProb = termProb / factorial((int) termCount);
 			    prob = prob * termProb;
 			}
-                         else {
-			    termProb = termCount * Math.log(termProb);
-			    termProb = termProb - Math.log(factorial((int) termCount));
-			    prob = prob + termProb;
-                        }
+            else {
+            	if (Double.isNaN(Math.log(termProb)))
+            		termProb = 0;
+            	else
+            		termProb = termCount * Math.log(termProb);
+			   termProb = termProb - Math.log(factorial((int) termCount));
+			   prob = prob + termProb;
+            }
 		}
-                if (!uselog)
+        if (!uselog)
 		    prob = factorial((int) counter.totalCount()) * prob;
 		else
 		    prob = Math.log(factorial((int) counter.totalCount())) + prob;
 		return prob;
-		// return this.probabilityOfDocLenght(input) * prob;
 	}
     /**
        false argument passed to getProbabilityOfDocGivenClass method. 
@@ -458,13 +458,14 @@ public class MultinomialDocumentModel {
 		
 		double docLikelyHood = this.documentLikelyhood(docId);
 		
-                if (!uselog)
-		    return (classPrior / docLikelyHood) * docCondProb;
-                else {
-		    double logdoclikely = 0.0;
-		    if (docLikelyHood != 0.00000000000000)
-			logdoclikely = Math.log(docLikelyHood);	
-		    return Math.log(classPrior) + docCondProb - logdoclikely;
+        if (!uselog)
+		   return (classPrior / docLikelyHood) * docCondProb;
+        else {
+		   double logdoclikely = 0.0;
+		   if (!Double.isNaN(Math.log(docLikelyHood)))
+		        logdoclikely = Math.log(docLikelyHood);	
+		   logdoclikely = Math.log(docLikelyHood);	
+		   return Math.log(classPrior) + docCondProb - logdoclikely;
 		}
 	}
 
@@ -476,17 +477,15 @@ public class MultinomialDocumentModel {
 		if (docCondProb == 0.0)
 			return 0.0;
 		double docLikelyHood = this.documentLikelyhood(input);
-
 		if (!uselog)
 		    return (classPrior / docLikelyHood) * docCondProb;
-                else {
+        else {
 		    double logdoclikely = 0.0;
-		    if (docLikelyHood != 0.00000000000000)
-			logdoclikely = Math.log(docLikelyHood);	
+		    if (!Double.isNaN(Math.log(docLikelyHood)))
+		        logdoclikely = Math.log(docLikelyHood);	
 		    return Math.log(classPrior) + docCondProb - logdoclikely;
 		}
-                
-        }
+    }
 
 	/**
 	 * learning to classify from text from labeled and unlabeled data (kamal
@@ -505,14 +504,13 @@ public class MultinomialDocumentModel {
 		return classcount / numdocs;
 	}
 
-	public static int factorial(int iNo) {
+	public static long factorial(int iNo) {
 		if (iNo < 0)
 			throw new IllegalArgumentException("iNo must be >= 0");
-		int factorial = 1;
+		long factorial = 1;
 		for (int i = 2; i <= iNo; i++)
 			factorial *= i;
 
 		return factorial;
-	}
-
+	}	
 }

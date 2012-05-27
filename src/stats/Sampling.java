@@ -4,8 +4,6 @@
 package stats;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
 import cern.jet.random.engine.RandomEngine;
@@ -16,6 +14,8 @@ import cern.jet.random.sampling.RandomSampler;
  *	Some sampling routines using the colt library
  */
 public class Sampling {
+	
+
 	/**
 	 * Given a list of object, this routine returns a sample of population
 	 * of size sample size choosen at random without replacement from the 
