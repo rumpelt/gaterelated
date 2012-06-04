@@ -108,24 +108,29 @@ public class ProcessController {
 	
 	/**
 	 * execute the processing resources specified in list sequentially processes
-	 * @param corpus
+	 * @param corpus	
 	 */
 	public void executePRSequentially(Corpus corpus) {
 		for (ProcessingResource pr : this.processes) {
 			try {
 				try {
 					pr.setParameterValue("corpus", corpus);
+					for (Object doc : corpus) 
+						pr.setParameterValue("document", doc); // some default prs require this param
 				} catch (ResourceInstantiationException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				pr.execute();
-				
 			} catch (ExecutionException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
 		}
+		if (this.directoryToDump != null) // if this option is specified then we need to dump also. Beware the pr it self also not dump.
+			CorpusClass.dumpondisk(corpus, 
+					this.directoryToDump,  
+					this.datastorage.getAnnToPpreserve());
 	}
 	
 	/**

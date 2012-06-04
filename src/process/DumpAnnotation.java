@@ -7,8 +7,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import annotation.SortedAnnotationList;
+import au.com.bytecode.opencsv.CSVWriter;
 
 import datastore.CorpusClass;
 
@@ -35,13 +37,17 @@ public class DumpAnnotation implements LanguageAnalyser {
 	 * dump_file : name file to used to dump the contents
 	 * low_age: low_age
 	 * up_age : up_age
-	 * fieldtype
+	 * fieldtype : regular expression containing the field.
+	 * command line example from the gate MainEntry
+	 * --dir="/home/ashwani/xyz/test1"  --processes="process.DumpAnnotation" 
+	 * --pparams="-process.DumpAnnotation dump_file:/home/ashwani/xyz/Appetite-4.csv  
+	 * low_age:0.0 up_age:7.0"
 	 */
 	private FeatureMap parameters;
 	/**
 	 * name of file to dump the content
 	 */
-	private FileWriter fwriter;
+	private CSVWriter fwriter;
 	/**
 	 * the name of defualt annotation set
 	 */
@@ -155,18 +161,16 @@ public class DumpAnnotation implements LanguageAnalyser {
 
 	private void dumptoFile(String identifier , List<Annotation> anns, Document doc) {
 		try {
+			String[] row = new String[3];
+			row[0] = identifier;
+
 			for (Annotation a: anns) {
-				this.fwriter.write(identifier+"," );
+				row[1] = (String)a.getFeatures().get("age");
 				String content = doc.getContent().getContent(a.getStartNode().getOffset()
 						, a.getEndNode().getOffset()).toString();
-				this.fwriter.write((String)a.getFeatures().get("age")+",");
-				this.fwriter.write("\""+content+"\"");
-				
-				this.fwriter.write("\n");
+				row[2] = "\""+content+"\"";
+				this.fwriter.writeNext(row);
 			}
-		}
-		catch (IOException e) {
-			e.printStackTrace();
 		}
 		catch (InvalidOffsetException e) {
 			e.printStackTrace();
@@ -184,7 +188,8 @@ public class DumpAnnotation implements LanguageAnalyser {
 		try {
 			if (this.fwriter == null) {
 				try {
-					this.fwriter = new FileWriter((String)this.parameters.get("dump_file"));
+					FileWriter fw = new FileWriter((String)this.parameters.get("dump_file"));
+					this.fwriter = new CSVWriter(fw);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -193,6 +198,9 @@ public class DumpAnnotation implements LanguageAnalyser {
 		
 			float lowage = Float.parseFloat((String)this.getParameterValue("low_age"));
 			float upage = Float.parseFloat((String)this.getParameterValue("up_age"));
+			String regex = (String) this.parameters.get("fieldtype"); // for example for feeding: ((feed[a-z]{0,3})|(appetite))\s*[:?]$
+			Pattern pattern = Pattern.compile(regex,Pattern.CASE_INSENSITIVE);
+			
 			while (docI.hasNext()) {
 				Document doc = (Document) docI.next();
 				AnnotationSet orig = doc.getAnnotations(this.defaultAnn);
@@ -214,8 +222,10 @@ public class DumpAnnotation implements LanguageAnalyser {
 							tatts.add(a);
 						}
 					}
+					
 					if (a.getType().equalsIgnoreCase("FieldValue")) {
-						if (a.getFeatures().get("fieldtype").equals(this.parameters.get("fieldtype"))) {
+						String fdtype = (String)a.getFeatures().get("fieldtype");
+						if (pattern.matcher(fdtype).matches()) {
 							for (Annotation t : tatts) {
 								if (a.getStartNode().getOffset() >= t.getStartNode().getOffset() &&
 									a.getEndNode().getOffset() <= t.getEndNode().getOffset()) {
