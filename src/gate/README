@@ -1,0 +1,34 @@
+Some command option to give for text processing using gate.
+
+1. To process a single xml file and generate whole bunch file based on
+some root element, use the following command.
+
+ --controllertype=serialAnalyserController --dd=/home/ashwani/xyz/datastore/ 
+--cf=/home/ashwani/xyz/babiesnotes.xml --cftype=xml 
+  --rootelement=PERSON --annset="Original markups"
+ 
+ here annset is given so as to dump the orginal markup else some other can be dumped
+
+2. To do a jape processing on a set of documents in a directory , use the following
+command.
+ --controllertype=serialAnalyserController --dd=/home/ashwani/xyz/pdatastore/  
+--dir=/home/ashwani/xyz/datastore --processes="gate.creole.tokeniser.DefaultTokeniser"  
+ --pparams=" -gate.creole.tokeniser.DefaultTokeniser       
+ transducerGrammarURL:/home/ashwani/xyz/newfield.jape"  --annset="Field"
+
+ There results will be dumped to direcotry of  -dd option.
+ the input documents are in --dir option .
+The annset option specifies an annotation set created due to the jape rule
+in the newfield.jape and this will be dumped. If you donot specify this then whole lot 
+of things will be dumped.
+
+3. To use your own custom made processing resource such as the CrreateFieldValues.jape
+
+--controllertype=serialAnalyserController  --dir=/home/ashwani/xyz/pdatastore
+ --processes="process.CreateFieldValues"  --pparams=" -process.CreateFieldValues  
+       name:justlikethat dumpdirectory:/home/ashwani/xyz/pvdatastore"
+
+--pparams give the option to the processing resource create field values
+
+Also you can look the comment section of the custom made processing file
+to see the run time parameters required
