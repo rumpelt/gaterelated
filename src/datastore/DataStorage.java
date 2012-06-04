@@ -228,7 +228,7 @@ public class DataStorage implements Collection<CorpusClass>{
 			if (!file.isDirectory())
 				filesToProcess.add(file);
 			else
-				getAllFiles(directoryToProcess, filesToProcess);
+				getAllFiles(file, filesToProcess);
 		}
 	}
 	public Set<Corpus> getCorpusSet() {

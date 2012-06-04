@@ -301,7 +301,6 @@ public class CorpusClass implements Corpus {
 						String name = (String) namesToKeep.next();
 						Set<Annotation> allannotation = doc.getAnnotations();
 						for (Annotation a : allannotation) {
-
 							if (a.getType().equalsIgnoreCase(name)) {
 								tokeep.add(a);
 							}
@@ -309,7 +308,6 @@ public class CorpusClass implements Corpus {
 					}
 					out.write(doc.toXml(tokeep));
 				}
-
 				out.close();
 				fos.close();
 			} catch (IOException e) {
