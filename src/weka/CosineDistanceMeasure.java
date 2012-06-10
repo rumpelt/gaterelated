@@ -84,7 +84,30 @@ public class CosineDistanceMeasure extends EuclideanDistance{
 		}
 		
 	}
-	
+	/**
+	 * returns the cosine distance.
+	 * To find the actual angle you need to take the inverse cosine of the 
+	 * result
+	 * @param vec1
+	 * @param vec2
+	 * @return
+	 */
+	public static double distance(double[] vec1, double[] vec2) {
+		assert(vec1.length == vec2.length);
+		double product = 0;
+		double vec1magnitude = 0;
+		double vec2magnitude = 0;
+		for (int count =0 ; count < vec1.length; count++) {
+			product = product + vec1[count] * vec2[count];
+			vec1magnitude = vec1magnitude + Math.pow(vec1[count], 2);
+			vec2magnitude = vec2magnitude + Math.pow(vec2[count], 2);
+		}
+		double deno = vec1magnitude * vec2magnitude;
+		if (deno == 0.0)
+			return Double.NaN;
+		else
+			return product/ deno;
+	}
 	/* 
 	 * (non-Javadoc)
 	 * @see weka.core.DistanceFunction#distance(weka.core.Instance, weka.core.Instance)

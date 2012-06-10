@@ -3,16 +3,25 @@
  */
 package topicmodel;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+
+import au.com.bytecode.opencsv.CSVWriter;
+
+
+import cchs.CategoryVectors;
 import stats.PositionIntCounter;
+import stats.Sampling;
 
 import edu.stanford.nlp.stats.Counter;
 import edu.stanford.nlp.stats.Distribution;
 import edu.stanford.nlp.stats.IntCounter;
-
 /**
  * 
  * @author ashwani Based on the paper
@@ -269,6 +278,15 @@ public class MultinomialDocumentModel {
 	    }
 	    return cwordcount / totalcompwordcount;
          }
+    
+    public List<String>  docTerms(String docId ) {
+    	Counter<String> crt = this.docCounters.get(docId);
+    	List<String> keys = new ArrayList<String>();
+    	for (String key : crt.keySet()) {
+    		keys.add(key);
+    	}
+    	return keys;
+    }
 	/**
 	 * 
 	 * P(Wt | Cj) Following refrences learning to classify from text from
@@ -283,19 +301,26 @@ public class MultinomialDocumentModel {
 			List<String> vocab) {
 
 		double wordCount = 1; // initialized to 1 for smoothing
-
+		
 		for (String docId : this.docCounters.keySet()) {
-			if (topic.equals(this.docTopicMap.get(docId)))
-				wordCount = wordCount
-						+ this.docCounters.get(docId).getCount(word);
+			
+			if (topic.equals(this.docTopicMap.get(docId))) {
+				if (this.docCounters.get(docId).getCount(word) > 0) {
+					wordCount = wordCount
+		    				+ this.docCounters.get(docId).getCount(word) ;
+				}
+			}
 		}
+		
 		double totalWordCount = vocab.size(); // initailized to vocab size for
 												// smoothing
 		for (String term : vocab) {
 			for (String docId : this.docCounters.keySet()) {
-				if (topic.equals(this.docTopicMap.get(docId)))
-					totalWordCount = totalWordCount
-							+ this.docCounters.get(docId).getCount(term);
+				if (topic.equals(this.docTopicMap.get(docId))) {
+					if (this.docCounters.get(docId).getCount(term) > 0) {
+						totalWordCount = totalWordCount
+							+ this.docCounters.get(docId).getCount(term);					}
+				}
 			}
 		}
 		return wordCount / totalWordCount;
@@ -319,7 +344,37 @@ public class MultinomialDocumentModel {
 		return Distribution.getDistribution(counter)
 				.probabilityOf(input.size());
 	}
-
+	
+	/**
+	 *Get the vocabulary given a topic or if topic is null then get the whole
+	 * vocabulary 
+	 * @param topic
+	 * @return
+	 */
+   public List<String> getVocab(String topic) {
+	    List<String> vocab = new ArrayList<String>();
+	    
+		for (String key : this.docCounters.keySet()) {
+			if (topic == null || this.docTopicMap.get(key).equals(topic)) {
+				for (String term : this.docCounters.get(key).keySet()) {
+					if (!vocab.contains(term))
+						vocab.add(term);
+				}
+			}
+		}
+		return vocab;
+	}
+   
+    public HashMap<String, Double> getDistributionForTopic(String topicName) {
+    	HashMap<String, Double> dist = new HashMap<String, Double>();
+    	List<String> vocab = this.getVocab(topicName);
+    	for  (String v : vocab) {
+    		dist.put(v, this.getProbabilityOfWordGivenClass(v, topicName,
+    				vocab));
+    	}
+    	return dist;
+    }
+   
     public double getProbabilityOfDocGivenClass(String docId, String topicName, boolean uselog) {
 	        double prob;
 	        if (!uselog)
@@ -337,11 +392,8 @@ public class MultinomialDocumentModel {
 			double termCount = this.docCounters.get(docId).getCount(term);
 			if (termCount == 0.0)
 				continue;
-			double termProb = this.getProbabilityOfWordGivenClass(term,
-									      topicName, vocab);
-		        //double comptermProb = this.getProbOfCompWordGivenClass(term, topicName, vocab, 1, true);
-			//termProb = termProb / comptermProb;
-			if (!uselog) {
+			double termProb = this.getProbabilityOfWordGivenClass(term, topicName, vocab);
+		    if (!uselog) {
 			    termProb = Math.pow(termProb, termCount);
 			    termProb = termProb / factorial((int) termCount);
 			    prob = prob * termProb;
@@ -362,7 +414,6 @@ public class MultinomialDocumentModel {
                 else
                     prob = Math.log(factorial((int) this.docCounters.get(docId).totalCount())) + prob;
 		return prob;
-		// return this.probabilityOfDocLenght(docId) * prob;
 	}
 
 	public double getProbabilityOfDocGivenClass(List<String> input,
@@ -450,7 +501,7 @@ public class MultinomialDocumentModel {
 	}
 
     public double getProbOfClassGivenDocument(String docId, String topicName, boolean uselog) {
-		double classPrior = this.getClassPriorProbability(topicName);
+    	double classPrior = this.getClassPriorProbability(topicName);
 		double docCondProb = this.getProbabilityOfDocGivenClass(docId,
 									topicName, uselog);
 		if (docCondProb == 0.0)
@@ -468,9 +519,39 @@ public class MultinomialDocumentModel {
 		   return Math.log(classPrior) + docCondProb - logdoclikely;
 		}
 	}
-
+    public double averageSentenceLenght() {
+    	double totalcount = 0;
+    	for (String  k: this.docCounters.keySet()) {
+    		totalcount = totalcount + this.docCounters.get(k).totalCount();
+    	}
+    	return totalcount / this.docCounters.size();
+    }
+    
+    public List<String> generateWords(List<String> input ,
+    		 String generationTopic, int popsize , int scatter) {
+    	
+    	ArrayList<String> generatedWord =new ArrayList<String>();
+    	double wordcount =
+    		BigDecimal.valueOf(this.averageSentenceLenght()).setScale(0, RoundingMode.HALF_UP).intValue();
+    	
+    	int count = 0;
+        HashMap<String, Double> worddist = null;
+		worddist = 
+			this.getDistributionForTopic(generationTopic);
+		List<String> words = Sampling.generatePopulation(worddist,
+    			popsize, scatter);
+		
+    	for ( ; count < wordcount ; 	count++) {    		
+    		Object choosenword = Sampling.sampleWithoutReplacement(words,
+    				1, false,false , new ArrayList<Object> ()).get(0);
+    		generatedWord.add((String)choosenword);
+    	}
+    	return generatedWord;
+    }
+    
 	public double getProbOfClassGivenDocument(List<String> input,
 						  String topicName, boolean uselog) {
+		
 		double classPrior = this.getClassPriorProbability(topicName);
 		double docCondProb = this.getProbabilityOfDocGivenClass(input,
 									topicName, uselog);
@@ -481,9 +562,13 @@ public class MultinomialDocumentModel {
 		    return (classPrior / docLikelyHood) * docCondProb;
         else {
 		    double logdoclikely = 0.0;
+		    double lcalssprior = 0.0;
 		    if (!Double.isNaN(Math.log(docLikelyHood)))
-		        logdoclikely = Math.log(docLikelyHood);	
-		    return Math.log(classPrior) + docCondProb - logdoclikely;
+		        logdoclikely = Math.log(docLikelyHood);
+		    if (!Double.isNaN(Math.log(classPrior)))
+		    	lcalssprior  = Math.log(classPrior);
+		    double val = lcalssprior + docCondProb - logdoclikely;
+		    return val;
 		}
     }
 
@@ -496,12 +581,14 @@ public class MultinomialDocumentModel {
 	 */
 	public double getClassPriorProbability(String topicName) {
 		double numdocs = this.docTopicMap.size();
-		int classcount = 0;
+		// class count init to 1 for laplace smooting
+		double classcount = 1;
 		for (String key : this.docTopicMap.keySet()) {
-			if (topicName.equals(this.docTopicMap.get(key)))
-				classcount++;
+			if (topicName.equals(this.docTopicMap.get(key))) {
+				classcount = classcount + 1;
+			}
 		}
-		return classcount / numdocs;
+		return classcount / (numdocs + this.getTopics().size());
 	}
 
 	public static long factorial(int iNo) {
@@ -512,5 +599,40 @@ public class MultinomialDocumentModel {
 			factorial *= i;
 
 		return factorial;
-	}	
+	}
+	
+	public  Counter<String> getCounterOfTopic(String topic) {
+		Counter<String> cnt = new IntCounter<String>();
+		for (String doc : this.docCounters.keySet()) {
+			if (this.docTopicMap.get(doc).equals(topic))
+			    cnt.addAll(this.docCounters.get(doc));
+		}
+		return cnt;
+	}
+	
+	public void printWordDistForEachTopic(String filename) throws IOException {
+		
+		HashMap<String, Counter<String>> topicCounter = 
+			new HashMap<String, Counter<String>>();
+		
+		for (String topic : this.getTopics()) {
+			topicCounter.put(topic, this.getCounterOfTopic(topic));
+		}
+		
+		FileWriter fw  = new FileWriter(filename);
+		CSVWriter csv = new CSVWriter(fw);
+		String[] row = new String[3];
+		
+		for (String topic : this.getTopics()) {
+			Counter<String> cnt = this.getCounterOfTopic(topic);
+			for (String key : cnt.keySet()) {
+				row[0] = topic;
+				row[1] = key;
+				row[2] = ""+(int)(cnt.getCount(key));
+				csv.writeNext(row);
+			}
+			
+		}
+		csv.close();
+	}
 }

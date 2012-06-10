@@ -1,0 +1,9 @@
+ReadMe file for command line options to MedicalTrainer module
+This module is currently invoked from Weka.MainDriver. --mt option tells the Weka.MainDriver 
+to launch this module
+1.   --mt  --lm  --cltype=tournamentmodel      --removeCommonCounters --numi=25 --samplesize=150 --dumpfile=/home/ashwani/xyz/test.csv   --ifile /home/ashwani/xyz/allfeedtype.csv    --tcol 3 --agecol 2 --idcol 1 --lcol  14  --lage 0.0 --uage 1.0 --idname=mrn --ngrams 1
+  lm specifies the language modeling
+
+2. For the manual assignment through rules
+--mt --manualruleset   --rulefile=/home/ashwani/xyz/filetotransfer/rules0-1.csv   --dumpfile=/home/ashwani/xyz/filetotransfer/manualclassfication.csv   --ifile /home/ashwani/xyz/filetotransfer/processfeed.csv   
+ --tcol 3 --agecol 2 --idcol 1   --lage 0.0 --uage 1.0  --idname=mrn --ngrams 1

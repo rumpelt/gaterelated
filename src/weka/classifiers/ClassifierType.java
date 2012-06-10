@@ -14,5 +14,13 @@ logistic,
 adaboost,
 mahoutOnlineLogisticRegression,
 tournamentmodel,
-wekaclassifiers
+wekaclassifiers;
+
+    public static boolean isWekaClassifer(String str) {
+    	ClassifierType clt = ClassifierType.valueOf(str);
+    	if (clt.equals(j48) || clt.equals(simplelogistic) || clt.equals(adaboost)
+    			|| clt.equals(logistic))
+    		return true;
+        return false;
+    }
 }

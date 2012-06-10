@@ -12,6 +12,9 @@ import java.util.Vector;
  *
  */
 public  enum FeedCategories {
+	BREAST("breast"),
+	BOTTLE("bottle"),
+	BREAST_AND_BOTTLE("breast and bottle"),
 	BREAST_AND_NO_INFORMATION_ON_CEREALS("breast and no information on cereals"),
 	BOTTLE_AND_NO_INFORMATION_ON_CEREALS("bottle and no information on cereals"),
 	BREAST_AND_BOTTLE_AND_NO_INFORMATION_ON_CEREALS("breast and bottle and no information on cereals"),
@@ -39,7 +42,7 @@ public  enum FeedCategories {
 	BOTTLE_AND_CEREALS_AND_NO_JUICES("bottle and cereals and no juices"),
 	BOTTLE_AND_NO_CEREALS_AND_NO_JUICES("bottle and no cereals and no juices"),
 	BOTTLE_AND_NO_JUICES("bottle and no juices"),
-	
+	NA("NA"),
 	UNKNOWN("UNKNOWN");
 	
 	private String categoryname;

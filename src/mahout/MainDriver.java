@@ -28,8 +28,7 @@ public class MainDriver {
 		final Configuration conf = new Configuration();
 	    List<Vector> vecs = SequenceFileReader.getAllVector(conf, 
 				"/home/ashwani/xyz/arff/triSet1-2.mvc");
-		LogisticRegression.doLeaveOneOutCrossValidation(vecs,
-				"/home/ashwani/xyz/arff/triSet1-2.csv");
+		
 	}
 	
 }	

@@ -3,8 +3,12 @@
  */
 package tokenizers;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -14,7 +18,12 @@ import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.StopAnalyzer;
 import org.apache.lucene.util.Version;
 
+import specialstruct.StringCounter;
+
+import au.com.bytecode.opencsv.CSVReader;
+
 import cchs.CounterComparison;
+import cchs.FeedCategories;
 
 
 import edu.stanford.nlp.stats.Counter;
@@ -85,40 +94,52 @@ public final class StopWordList {
 		StopWordList.medicalWords.remove(toRemove);
 	}
 	
-	public static boolean acceptInput(List<String> input) {
+	public static String acceptInput(List<String> input, 
+			HashMap<StringCounter, FeedCategories> map) {
 		Counter<String> inputCounter = new IntCounter<String>();
+		String category = null;
 		for (String in : input)
 			inputCounter.incrementCount(in);
-		for (Counter<String> cnt :  StopWordList.getCounterToFilter()) {
+		for (Counter<String> cnt :  map.keySet()) {
 			if (CounterComparison.areEqual(cnt, inputCounter))
-				return false;
+				return map.get(cnt).toString();
 		}
-		return true;
+		return category;
 	}
 		
-	public static List<Counter<String>>  getCounterToFilter() {
-		ArrayList<Counter<String>> counters = new ArrayList<Counter<String>>();
-		Counter<String> breast = new IntCounter<String>();
-		breast.incrementCount("breast");
-		counters.add(breast);
-			
-		Counter<String> bottleuseenfamillipil = new IntCounter<String>();
-		bottleuseenfamillipil.incrementCount("bottle");
-		bottleuseenfamillipil.incrementCount("use");
-		bottleuseenfamillipil.incrementCount("enfamil");
-		bottleuseenfamillipil.incrementCount("lipil");
-		counters.add(bottleuseenfamillipil);
-			
-		Counter<String> breastandbottleuseenfamillipil = new IntCounter<String>();
-		breastandbottleuseenfamillipil.incrementCount("breast");
-		breastandbottleuseenfamillipil.incrementCount("and");
-	    breastandbottleuseenfamillipil.incrementCount("bottle");
-		breastandbottleuseenfamillipil.incrementCount("use");
-		breastandbottleuseenfamillipil.incrementCount("enfamil");
-		breastandbottleuseenfamillipil.incrementCount("lipil");
-		counters.add(breastandbottleuseenfamillipil);
-			
-		return counters;
+	/**
+	 * the rule file must have phrase in the first column and the labelled 
+	 * category in third column.
+	 * @param rulefile
+	 * @param skipHeader
+	 * @return
+	 * @throws IOException
+	 */
+	public static HashMap<StringCounter, FeedCategories>  getCounterToFilter(
+			String rulefile, boolean skipHeader) throws IOException {
+		HashMap<StringCounter, FeedCategories> map = 
+			new HashMap<StringCounter, FeedCategories>();
+		
+		CSVReader reader = new CSVReader(new FileReader(rulefile));
+		
+		if (skipHeader)
+			reader.readNext();
+		
+		String[] row = null;
+		while ((row = reader.readNext()) != null) {
+			String text = row[0];
+			if (row[2] == null)
+				continue;
+			String category = row[2].trim();
+			if (category.length() <= 0)
+				continue;
+			StringCounter cntr = new StringCounter();
+			for(String s : text.split("\\s+")) {
+				cntr.incrementCount(s);
+			}
+			map.put(cntr, FeedCategories.getValueOf(category));
+		}
+		return map;
 	}
     
 }

@@ -187,9 +187,10 @@ public final class CommonClassifierRoutines {
 	
 
 	
-	public static void leaveOneOutCrossValidation(AbstractClassifier classifier ,
+	public static double leaveOneOutCrossValidation(AbstractClassifier classifier ,
 			Instances instances, int[] indicesTORemove, int [] indicesToPrint,
 			String[] options, String dumpfile) throws Exception {
+		double missclassified = 0;
 		Instances copied = instances;
 		if (indicesTORemove != null)
 			copied = CommonClassifierRoutines.removeAttributes(instances, indicesTORemove);
@@ -220,20 +221,17 @@ public final class CommonClassifierRoutines {
 			dump[dumpind++] = instances.classAttribute().value((int)result);
 			if (dump[dumpind-1].equals(dump[dumpind-2]))
 				dump[dumpind++] = "1";
-			else
+			else {
 				dump[dumpind++] = "0";
+				missclassified++;
+			}
 			for (double val : dists)
 				dump[dumpind++] = new String(""+val);
-			
-		
 			if (csvWriter != null)
-				csvWriter.writeNext(dump);
-			else if (!instances.get(i).stringValue(
-					instances.classAttribute()).equals(dump[dumpind]))
-				System.out.println(dump);
-			
+				csvWriter.writeNext(dump);			
 		}
 		if (csvWriter != null)
 			csvWriter.close();
+		return missclassified;
 	}
 }
