@@ -49,7 +49,11 @@ public class MultinomialDocumentModel {
 		}
 
 	}
-	
+	/**
+	 * create a global counter over all the topics.
+	 * i.e. over all term distribution
+	 * @return
+	 */
 	public  IntCounter<String> createGlobalCounter() {
 		IntCounter<String> global = new IntCounter<String>();
 		for (Counter<String> eachcounter : this.docCounters.values()) {
@@ -634,5 +638,23 @@ public class MultinomialDocumentModel {
 			
 		}
 		csv.close();
+	}
+	
+	public void removeSingleCountTerms() {
+		Counter<String> global = this.createGlobalCounter();
+		
+		for (String doc : this.docTopicMap.keySet()) {
+			Counter<String> doccounter = this.docCounters.get(doc);
+	        List<String> keys = new ArrayList<String>();
+	        for (String key : doccounter.keySet()) {
+	        	keys.add(key);
+	        }
+			for (String key : keys) {
+				if (global.getCount(key) == 1.000000000) {
+					global.remove(key);
+					doccounter.remove(key);
+				}
+			}
+		}
 	}
 }

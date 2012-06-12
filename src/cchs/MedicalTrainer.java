@@ -244,7 +244,7 @@ public class MedicalTrainer extends Object {
 			this.doLanguageModelWithSampling(this.samplesize, 
 					this.numIteration);
 		} else if (this.manualruleset) {
-	     	//	this.genreateRuleFile();
+	     		//this.generateRuleFile();
 			this.doManualClassification();		
 		}
 		else if (ClassifierType.isWekaClassifer(this.cltype.toString())){
@@ -1406,6 +1406,9 @@ public class MedicalTrainer extends Object {
 			CSVWriter csvwriter) throws Exception {
 		
 		List<MultinomialDocumentModel> container = this.populateModels(records);
+		for (MultinomialDocumentModel md : container) {
+			md.removeSingleCountTerms();
+		}
 	//	container.get(0).printWordDistForEachTopic();
 		int missclassifier = 0;
 
