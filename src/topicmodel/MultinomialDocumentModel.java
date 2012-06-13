@@ -534,7 +534,7 @@ public class MultinomialDocumentModel {
     public List<String> generateWords(List<String> input ,
     		 String generationTopic, int popsize , int scatter) {
     	
-    	ArrayList<String> generatedWord =new ArrayList<String>();
+    	ArrayList<String> generatedWord = null;
     	double wordcount =
     		BigDecimal.valueOf(this.averageSentenceLenght()).setScale(0, RoundingMode.HALF_UP).intValue();
     	
@@ -545,11 +545,9 @@ public class MultinomialDocumentModel {
 		List<String> words = Sampling.generatePopulation(worddist,
     			popsize, scatter);
 		
-    	for ( ; count < wordcount ; 	count++) {    		
-    		Object choosenword = Sampling.sampleWithoutReplacement(words,
-    				1, false,false , new ArrayList<Object> ()).get(0);
-    		generatedWord.add((String)choosenword);
-    	}
+		generatedWord = (ArrayList<String>) Sampling.sampleWithoutReplacement(words,
+    			(int)wordcount, false,false , new ArrayList<Object>() );
+   
     	return generatedWord;
     }
     

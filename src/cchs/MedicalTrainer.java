@@ -1353,7 +1353,7 @@ public class MedicalTrainer extends Object {
 		}
 		if (cv != null)
 		cv.close();
-		System.out.println(result);
+		//System.out.println(result);
 	}
 
 	public void debugLanguageModel(List<Record> records, String fileName)
@@ -1501,7 +1501,7 @@ public class MedicalTrainer extends Object {
 				double predicted = this.doTournament(test,
 						unitopics, this.ngramsToGet.size());
 				if (predicted != test.get(test.size() -1)) {
-					/*
+				/*
 				    List<String> generatedWords = container.get(0).
 				    generateWords(this.returnTokens(record.getText(), 1,
 							this.removeCommonCounters),
@@ -1514,7 +1514,7 @@ public class MedicalTrainer extends Object {
 					re.setText(StringUtils.join(generatedWords, " "));
 					re.setTextcategory(unitopics.get((int) test.get(test.size() -1)));
 					this.population.add(re);
-					*/
+				*/	
 					missclassifier++;
 					String[] output = new String[test.size() + 1  + 1];
 					if (csvwriter != null) {
