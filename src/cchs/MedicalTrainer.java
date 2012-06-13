@@ -55,6 +55,7 @@ import weka.classifiers.ClassifierType;
 import weka.classifiers.CommonClassifierRoutines;
 import weka.classifiers.Evaluation;
 import weka.classifiers.J48Classifier;
+import weka.classifiers.bayes.NaiveBayesMultinomial;
 import weka.classifiers.functions.Logistic;
 import weka.classifiers.functions.SimpleLogistic;
 import weka.classifiers.meta.AdaBoostM1;
@@ -252,12 +253,15 @@ public class MedicalTrainer extends Object {
 			this.doWekaClassificationWithSampling(this.samplesize, this.numIteration);
 		}
 	}
-
+    /**
+     */
 	public String[] cloptionparser(String opt) {
 		StringTokenizer st = new StringTokenizer(opt, ",");
 		ArrayList<String> opts = new ArrayList<String>();
 		while (st.hasMoreTokens()) {
-			opts.add(st.nextToken());
+                        StringTokenizer inner = new StringTokenizer(st.nextToken(), ":");
+                        while(inner.hasMoreTokens())
+         		    opts.add(inner.nextToken());
 		}
 		return opts.size() == 0 ? null : opts.toArray(new String[opts.size()]);
 	}
@@ -389,6 +393,10 @@ public class MedicalTrainer extends Object {
 			this.classifier = new AdaBoostM1();
 			this.classifier.setOptions(options);
 		}
+                else if (cltype.equals(ClassifierType.naivebayesmultinomial)) {
+		    this.classifier  = new NaiveBayesMultinomial();
+                    this.classifier.setOptions(options);
+                }
 		else if (ctype.equals(ClassifierType.randomforest)) {
 			this.classifier = new RandomForest();
 			this.classifier.setOptions(options);
@@ -709,7 +717,7 @@ public class MedicalTrainer extends Object {
 	 * @throws IOException
 	 */
 	public WekaInstances returnIndicatorVectorOfTermSpace(List<Record> records,
-			Set<String> termspace, boolean doNotAddUnkownClass , boolean removeCommonCounters)
+							      Set<String> termspace, boolean doNotAddUnkownClass , boolean removeCommonCounters, boolean actualcount)
 			throws NumberFormatException, IOException {
 		if (records == null)
 			records = this.population;
@@ -761,10 +769,21 @@ public class MedicalTrainer extends Object {
 			for (int ngram : this.ngramsToGet) {
 				Set<String> terms = this
 						.returnUniqueNgramTermspace(record.getText(), ngram, removeCommonCounters);
+                                IntCounter<String> termcounts = null;
+                                if (actualcount) {
+                                    termcounts = new IntCounter<String>();
+                                    for (String t : terms)
+                                        termcounts.incrementCount(t);
+                                }
+
 				if (termspace != null) {
 					for (String t : terms) {
-						if (termspace.contains(t))
-							wekainstances.setValueOfWorkingInstance(t, 1.0);
+					    if (termspace.contains(t)) {
+                                                if (actualcount)
+                                                    wekainstances.setValueOfWorkingInstance(t, termcounts.getCount(t));
+                                                else
+					            wekainstances.setValueOfWorkingInstance(t, 1.0);
+					    }
 					}
 				} else {
 					for (String t : terms)
@@ -1326,7 +1345,7 @@ public class MedicalTrainer extends Object {
 			if (this.removesinglecount)
 				termspace = KLDivergence.removeSingleCounteTerms(termspace);
 			 WekaInstances trainingSet = this.returnIndicatorVectorOfTermSpace(records,
-					termspace.keySet(), true, this.removeCommonCounters);
+											   termspace.keySet(), true, this.removeCommonCounters, true);
 			double miss = CommonClassifierRoutines.leaveOneOutCrossValidation(
 					this.classifier, trainingSet, this.indicesToRemove,
 					this.indicesTodump, this.classifieroptions, this.dumpfile);
