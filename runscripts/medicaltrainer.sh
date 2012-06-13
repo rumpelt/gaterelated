@@ -1,5 +1,11 @@
 #! /bin/sh
-args="--mt  --lm  --minngram=1  --cltype=tournamentmodel  --ifile /usa/arao/xyz/feedtype.csv    --tcol 3 --agecol 2 --idcol 1 --lcol  14  --lage 0.0 --uage 1.0 --idname=mrn --ngrams 1:2:3 --samplesize=150 --numi=25 --dumpfile=/usa/arao/xyz/test.csv"
+args="--mt  --lm  --minngram=1  --cltype=tournamentmodel  --ifile /usa/arao/xyz/goldset.csv    --tcol 3 --agecol 2 --idcol=1  --lcol  4  --lage 0.0 --uage 1.0 --idname=uid --ngrams 1 --removeCommonCounters --rulefile=/usa/arao/xyz/goldsetrules0-1.csv --samplesize=150 --numi=50 "
 classpath=$CLASSPATH":/usa/arao/jar/*:/usa/arao/projects/gaterelated/dist/lib/*"
+
+
+#args="--mt    --minngram=1  --cltype=simplelogistic  --ifile /usa/arao/xyz/goldset.csv    --tcol 3 --agecol 2 --idcol=1 --lcol=4  --lage 0.0 --uage 1.0 --idname=uid --ngrams 1 --removeCommonCounters --rulefile=/usa/arao/xyz/goldsetrules0-1.csv --samplesize=150 --numi=50 "
+classpath=$CLASSPATH":/usa/arao/jar/*:/usa/arao/projects/gaterelated/dist/lib/*"
+
+
 #echo $classpath
 java -classpath $classpath weka.MainDriver $args
