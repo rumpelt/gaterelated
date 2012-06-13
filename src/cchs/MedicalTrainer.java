@@ -58,6 +58,7 @@ import weka.classifiers.J48Classifier;
 import weka.classifiers.functions.Logistic;
 import weka.classifiers.functions.SimpleLogistic;
 import weka.classifiers.meta.AdaBoostM1;
+import weka.classifiers.trees.RandomForest;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -386,6 +387,10 @@ public class MedicalTrainer extends Object {
 			this.classifier.setOptions(options);
 		} else if (ctype.equals(ClassifierType.adaboost)) {
 			this.classifier = new AdaBoostM1();
+			this.classifier.setOptions(options);
+		}
+		else if (ctype.equals(ClassifierType.randomforest)) {
+			this.classifier = new RandomForest();
 			this.classifier.setOptions(options);
 		}
 	}

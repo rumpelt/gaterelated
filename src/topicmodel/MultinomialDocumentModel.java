@@ -10,6 +10,7 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import au.com.bytecode.opencsv.CSVWriter;
@@ -616,24 +617,24 @@ public class MultinomialDocumentModel {
 		
 		HashMap<String, Counter<String>> topicCounter = 
 			new HashMap<String, Counter<String>>();
-		
-		for (String topic : this.getTopics()) {
-			topicCounter.put(topic, this.getCounterOfTopic(topic));
-		}
-		
+		LinkedHashSet<String> vocab = new LinkedHashSet<String>();
+	    for (String topic : this.getTopics()) {
+	    	for (String term : this.getVocab(topic))
+	    		if (!vocab.contains(term))
+	    			vocab.add(term);
+	    }
 		FileWriter fw  = new FileWriter(filename);
 		CSVWriter csv = new CSVWriter(fw);
 		String[] row = new String[3];
 		
 		for (String topic : this.getTopics()) {
 			Counter<String> cnt = this.getCounterOfTopic(topic);
-			for (String key : cnt.keySet()) {
+			for (String term : vocab) {
 				row[0] = topic;
-				row[1] = key;
-				row[2] = ""+(int)(cnt.getCount(key));
+				row[1] = term;
+				row[2] = ""+(int)(cnt.getCount(term));
 				csv.writeNext(row);
 			}
-			
 		}
 		csv.close();
 	}
