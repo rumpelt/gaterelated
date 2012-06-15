@@ -5,7 +5,8 @@ package weka.classifiers;
 
 import java.io.FileWriter;
 import java.util.Random;
-
+import java.util.List;
+import java.util.ArrayList;
 import au.com.bytecode.opencsv.CSVWriter;
 import weka.classifiers.evaluation.output.prediction.AbstractOutput;
 import weka.core.Instance;
@@ -187,10 +188,11 @@ public final class CommonClassifierRoutines {
 	
 
 	
-	public static double leaveOneOutCrossValidation(AbstractClassifier classifier ,
+	public static List<Double> leaveOneOutCrossValidation(AbstractClassifier classifier ,
 			Instances instances, int[] indicesTORemove, int [] indicesToPrint,
 			String[] options, String dumpfile) throws Exception {
 		double missclassified = 0;
+                ArrayList<Double> missclassificationprob = new ArrayList<Double>();
 		Instances copied = instances;
 		if (indicesTORemove != null)
 			copied = CommonClassifierRoutines.removeAttributes(instances, indicesTORemove);
@@ -223,6 +225,7 @@ public final class CommonClassifierRoutines {
 				dump[dumpind++] = "1";
 			else {
 				dump[dumpind++] = "0";
+                                missclassificationprob.add(dists[(int)result]);  
 				missclassified++;
 			}
 			for (double val : dists)
@@ -232,6 +235,6 @@ public final class CommonClassifierRoutines {
 		}
 		if (csvWriter != null)
 			csvWriter.close();
-		return missclassified;
+		return missclassificationprob;
 	}
 }

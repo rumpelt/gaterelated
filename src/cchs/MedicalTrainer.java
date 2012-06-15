@@ -1346,10 +1346,10 @@ public class MedicalTrainer extends Object {
 				termspace = KLDivergence.removeSingleCounteTerms(termspace);
 			 WekaInstances trainingSet = this.returnIndicatorVectorOfTermSpace(records,
 											   termspace.keySet(), true, this.removeCommonCounters, true);
-			double miss = CommonClassifierRoutines.leaveOneOutCrossValidation(
+			List<Double> miss = CommonClassifierRoutines.leaveOneOutCrossValidation(
 					this.classifier, trainingSet, this.indicesToRemove,
 					this.indicesTodump, this.classifieroptions, this.dumpfile);
-			System.out.println(miss+ " ," + samplesize );
+			System.out.println(samplesize+","+miss.size()+","+StringUtils.join(miss, ",") );
 			if (this.dumparff != null) {
 				WekaRoutines.dumpArff(this.dumparff, trainingSet);
 			}
