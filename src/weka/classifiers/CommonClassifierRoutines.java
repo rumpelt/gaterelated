@@ -112,10 +112,13 @@ public final class CommonClassifierRoutines {
 	 * @throws Exception
 	 */
 	
-	public  static Instances testInstances(AbstractClassifier classifier,
+	public  static ArrayList<Double> testInstances(AbstractClassifier classifier,
 			Instances instances, int indexOfId,	int[] indicesToDelete,
 			int[] indicesToDump,String dumpfile , boolean dumpEverything) 
 	throws Exception {
+		double missclassified = 0;
+        ArrayList<Double> missclassificationprob = new ArrayList<Double>();
+
 		Remove rm = null;
 		Instances newInstances = instances;
 		if (indicesToDelete != null) {
@@ -131,10 +134,18 @@ public final class CommonClassifierRoutines {
 		for (int count = 0; count < newInstances.numInstances();count++) {
 			Instance instance = newInstances.get(count);
 			double result = classifier.classifyInstance(instance);
-			if (csvWriter == null)
-				System.out.println(instances.get(count).stringValue(indexOfId) +": "
+			double[] dists = classifier.distributionForInstance(instance) ;
+			String actualClass = instance.stringValue(newInstances.classAttribute());
+			String predictedClass = instances.classAttribute().value((int)result);
+			if (!actualClass.equals(predictedClass))
+			{
+				missclassificationprob.add(dists[(int)result]);  
+				missclassified++;
+				System.out.println(instances.get(count).value(indexOfId) +": "
 						+instance.classAttribute().value((int)result));
-			else {
+			}
+		
+			if (csvWriter != null) {
 				String[] dump = new String[indicesToDump.length+2];
 				for (int cnt = 0; cnt < dump.length; cnt++)
 					dump[cnt] = "";
@@ -161,7 +172,7 @@ public final class CommonClassifierRoutines {
 		}
 		if (csvWriter != null)
 			csvWriter.close();
-		return newInstances;
+		return missclassificationprob;
 	}
 	
 
