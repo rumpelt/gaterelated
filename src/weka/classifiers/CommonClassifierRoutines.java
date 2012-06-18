@@ -141,8 +141,8 @@ public final class CommonClassifierRoutines {
 			{
 				missclassificationprob.add(dists[(int)result]);  
 				missclassified++;
-				System.out.println(instances.get(count).value(indexOfId) +": "
-						+instance.classAttribute().value((int)result));
+				//System.out.println(instances.get(count).value(indexOfId) +": "
+				//		+instance.classAttribute().value((int)result));
 			}
 		
 			if (csvWriter != null) {

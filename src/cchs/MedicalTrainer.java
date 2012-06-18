@@ -429,7 +429,6 @@ public class MedicalTrainer extends Object {
 	 * file to dump the results to.
 	 */
 	private String dumpfile = null;
-	private String[] classifieroptions = null;
 	private boolean predict = false;
 	private WekaInstances trainingSet = null;
 	private boolean eval = false;
@@ -1361,7 +1360,8 @@ public class MedicalTrainer extends Object {
 		}
 		cv.close();
 	}
-
+        
+   
 	public void doWekaClassificationWithSampling(int samplesize, int numtime,
 			List<Record> trainrecords, List<Record> testrecords)
 			throws Exception {
@@ -1375,7 +1375,7 @@ public class MedicalTrainer extends Object {
 						samplesize, false, false, new ArrayList<Object>());
 				records = (ArrayList<Record>) objs; // not safe here be
 			}
-
+                        this.initClassifier(this.cltype, this.cloptions);
 			Counter<String> termspace = this
 					.returnFreqDistOnSetOfNgrams(records);
 			if (this.removesinglecount)
@@ -1387,7 +1387,7 @@ public class MedicalTrainer extends Object {
 			if (testrecords == null) {
 				miss = CommonClassifierRoutines.leaveOneOutCrossValidation(
 						this.classifier, trainingSet, this.indicesToRemove,
-						this.indicesTodump, this.classifieroptions,
+						this.indicesTodump, null,
 						this.dumpfile);
 			} else {
 				WekaInstances testinstances = this
@@ -1395,13 +1395,17 @@ public class MedicalTrainer extends Object {
 								termspace.keySet(), true, false, true);
 				this.classifier = CommonClassifierRoutines.trainOnInstances(
 						this.classifier, trainingSet, this.indicesToRemove,
-						this.classifieroptions);
+						null);
 				miss = CommonClassifierRoutines.testInstances(this.classifier,
 						testinstances, 0, this.indicesToRemove,
 						this.indicesToRemove, dumpfile, false);
 			}
-
-			System.out.println(samplesize + "," + miss.size() + ","
+                        int size= 0;
+			if (testrecords == null)
+			    size = samplesize;
+                        else
+                            size = testrecords.size();
+			System.out.println(size + "," + miss.size() + ","
 					+ StringUtils.join(miss, ","));
 			if (this.dumparff != null) {
 				WekaRoutines.dumpArff(this.dumparff, trainingSet);
