@@ -60,8 +60,13 @@ public final class CommonClassifierRoutines {
 		
 		Instances newInstances = null;
 	//String[] options = {"-U","-O","-B"};
-		if (options != null)
+		if (options != null) {
 			classifier.setOptions(options);
+			throw(new Exception("do not true to set the optoion here as weka " +
+					"clears the option variable and you can reuse that. I have deffered the code here" +
+					"but first you need create and duplicate of options and the use it. Once you do that " +
+					"remove thsi throw clause"));
+		}
 		
 		if (indicesToDelete != null) {
 			Remove rm =new Remove();

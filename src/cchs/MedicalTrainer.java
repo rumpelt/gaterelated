@@ -261,8 +261,9 @@ public class MedicalTrainer extends Object {
 			// this.generateRuleFile();
 			this.doManualClassification();
 		} else if (ClassifierType.isWekaClassifer(this.cltype.toString())) {
-			this.doWekaClassificationWithSampling(this.samplesize,
-					this.numIteration, this.population, this.testrecords);
+			this.doWekaVaidation(this.population, this.testrecords, 600, 100, 100);
+			//this.doWekaClassificationWithSampling(this.samplesize,
+				//	this.numIteration, this.population, this.testrecords);
 		}
 	}
 
@@ -396,25 +397,29 @@ public class MedicalTrainer extends Object {
 
 	public void initClassifier(ClassifierType ctype, String[] options)
 			throws Exception {
+		String[] duplicate = new String[options.length];
+		for (int i = 0; i < options.length;i++)
+			duplicate[i] = options[i];
 		if (ctype.equals(ClassifierType.j48)) {
 			this.classifier = new J48Classifier();
-			this.classifier.setOptions(options);
+			this.classifier.setOptions(duplicate);
 
 		} else if (ctype.equals(ClassifierType.simplelogistic)) {
 			this.classifier = new SimpleLogistic(100, true, false);
-			this.classifier.setOptions(options);
+			this.classifier.setOptions(duplicate);
+			
 		} else if (ctype.equals(ClassifierType.logistic)) {
 			this.classifier = new Logistic();
-			this.classifier.setOptions(options);
+			this.classifier.setOptions(duplicate);
 		} else if (ctype.equals(ClassifierType.adaboost)) {
 			this.classifier = new AdaBoostM1();
-			this.classifier.setOptions(options);
+			this.classifier.setOptions(duplicate);
 		} else if (cltype.equals(ClassifierType.naivebayesmultinomial)) {
 			this.classifier = new NaiveBayesMultinomial();
-			this.classifier.setOptions(options);
+			this.classifier.setOptions(duplicate);
 		} else if (ctype.equals(ClassifierType.randomforest)) {
 			this.classifier = new RandomForest();
-			this.classifier.setOptions(options);
+			this.classifier.setOptions(duplicate);
 		}
 	}
 
@@ -1361,7 +1366,37 @@ public class MedicalTrainer extends Object {
 		cv.close();
 	}
         
-   
+	public void doWekaVaidation(List<Record> trainrecords, List<Record> testrecords, 
+			double maxvalue, double stepsize, double initial)
+			throws Exception {
+
+		Counter<String> termspace = this.returnFreqDistOnSetOfNgrams(trainrecords);
+        if (this.removesinglecount)
+	        termspace = KLDivergence.removeSingleCounteTerms(termspace);
+        WekaInstances trainingSet = this.returnIndicatorVectorOfTermSpace(
+				trainrecords, termspace.keySet(), true,
+				this.removeCommonCounters, true);
+        WekaInstances testinstances = this.returnIndicatorVectorOfTermSpace(testrecords,
+				termspace.keySet(), true, false, true);
+        double miscount = testrecords.size();
+        String minoption = this.cloptions[1];
+		for (double i = initial; i < maxvalue; i = i + stepsize) {
+			this.cloptions[1] = ""+(int)i;
+            this.initClassifier(this.cltype, this.cloptions);
+			this.classifier = CommonClassifierRoutines.trainOnInstances(
+					this.classifier, trainingSet, this.indicesToRemove,
+					null);
+			List<Double> miss = CommonClassifierRoutines.testInstances(this.classifier,
+						testinstances, 0, this.indicesToRemove,
+						this.indicesToRemove, dumpfile, false);
+			if (miss.size() < miscount) {
+				miscount = miss.size();
+				minoption = this.cloptions[1];
+			}
+		}
+        System.out.println("option "+ minoption + " misscalssification "+ miscount);
+	}
+	
 	public void doWekaClassificationWithSampling(int samplesize, int numtime,
 			List<Record> trainrecords, List<Record> testrecords)
 			throws Exception {
@@ -1375,7 +1410,7 @@ public class MedicalTrainer extends Object {
 						samplesize, false, false, new ArrayList<Object>());
 				records = (ArrayList<Record>) objs; // not safe here be
 			}
-                        this.initClassifier(this.cltype, this.cloptions);
+            this.initClassifier(this.cltype, this.cloptions);
 			Counter<String> termspace = this
 					.returnFreqDistOnSetOfNgrams(records);
 			if (this.removesinglecount)
