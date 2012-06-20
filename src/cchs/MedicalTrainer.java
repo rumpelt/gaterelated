@@ -1462,7 +1462,7 @@ public class MedicalTrainer extends Object {
 						testinstances, 0, this.indicesToRemove,
 						this.indicesToRemove, dumpfile, false);
 			    }
-                int testsize= 0;
+                int size= 0;
 			    if (testrecords == null)
 			        size = initsize;
                 else
