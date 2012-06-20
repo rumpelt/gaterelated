@@ -94,9 +94,11 @@ public class MedicalTrainer extends Object {
 	private boolean removeCommonCounters = false;
 	private boolean manualruleset = false;
 	private String rulefile = null;
+	private int testsize = -1;
 
 	private static void addOptions() {
-
+		options.addOption("testsize", "testsize", true, "are we going to use the a testset ");
+		
 		options.addOption("testfile", "testfile", true,
 				"are we going to use the a test file");
 		options.addOption("manualruleset", "manualruleset", false,
@@ -238,6 +240,13 @@ public class MedicalTrainer extends Object {
 		public Record(String id) {
 			this.id = id;
 		}
+		
+		public boolean equals(Object record) {
+			if (this.getId().equals(((Record) record).getId()) &&
+					this.getAge() == ((Record) record).getAge())
+				return true;
+			return false;
+		}
 	}
 
 	/**
@@ -253,20 +262,24 @@ public class MedicalTrainer extends Object {
 				this.removeCommonCounters, false);
 		if (this.testfile != null)
 			this.testrecords = this.populateRecords(this.testfile,
-					this.testrecords, false, false);
+				this.testrecords, false, false);
+		if (this.testsize != -1 )  {			
+			this.testrecords = this.returnTestSet(this.population, this.testsize);
+		}
 
 		if (this.languageModel) {
 			this.doLanguageModelWithSampling(this.samplesize, this.numIteration);
 		} else if (this.manualruleset) {
-			// this.generateRuleFile();
-			this.doManualClassification();
+			 this.generateRuleFile();
+			//this.doManualClassification();
 		} else if (ClassifierType.isWekaClassifer(this.cltype.toString())) {
-			this.doWekaVaidation(this.population, this.testrecords, 600, 100, 100);
-			//this.doWekaClassificationWithSampling(this.samplesize,
-				//	this.numIteration, this.population, this.testrecords);
+			//this.doWekaVaidation(this.population, this.testrecords, 600, 100, 100);
+			this.doWekaClassificationWithSampling(this.samplesize, 30, this.population.size(),
+					this.numIteration, this.population, this.testrecords);
 		}
 	}
-
+   
+	
 	/**
      */
 	public String[] cloptionparser(String opt) {
@@ -289,10 +302,10 @@ public class MedicalTrainer extends Object {
 
 		CommandLine command = cmdLineGnuParser.parse(options, commandargs);
 
+		if (command.hasOption("testsize"))
+			mt.testsize = Integer.parseInt(command.getOptionValue("testsize"));
 		if (command.hasOption("testfile"))
 			mt.testfile = command.getOptionValue("testfile");
-		;
-
 		if (command.hasOption("manualruleset"))
 			mt.manualruleset = true;
 		if (command.hasOption("rulefile"))
@@ -397,9 +410,12 @@ public class MedicalTrainer extends Object {
 
 	public void initClassifier(ClassifierType ctype, String[] options)
 			throws Exception {
-		String[] duplicate = new String[options.length];
-		for (int i = 0; i < options.length;i++)
-			duplicate[i] = options[i];
+		String[] duplicate = null;
+		if (options != null) {
+			duplicate = new String[options.length];
+			for (int i = 0; i < options.length;i++)
+				duplicate[i] = options[i];
+		}
 		if (ctype.equals(ClassifierType.j48)) {
 			this.classifier = new J48Classifier();
 			this.classifier.setOptions(duplicate);
@@ -1396,57 +1412,68 @@ public class MedicalTrainer extends Object {
 		}
         System.out.println("option "+ minoption + " misscalssification "+ miscount);
 	}
-	
-	public void doWekaClassificationWithSampling(int samplesize, int numtime,
+	public List<Record> returnTestSet(List<Record> records, int samplesize) {
+		if (samplesize > records.size())
+			return null;
+		List<?> objs = Sampling.sampleWithoutReplacement(records,
+				samplesize, false, false, new ArrayList<Object>());
+		ArrayList<Record> testset = (ArrayList<Record>) objs;
+		for (Record record : testset) {
+			records.remove(record);
+		}
+		return testset;
+	}
+	public void doWekaClassificationWithSampling(int initsize, int incsize, int maxsize,  int numtime,
 			List<Record> trainrecords, List<Record> testrecords)
 			throws Exception {
 
-		if (testrecords != null || samplesize == -1)
-			samplesize = trainrecords.size();
-		List<Record> records = trainrecords;
-		for (int i = 0; i < numtime; i++) {
-			if (samplesize != trainrecords.size()) {
-				List<?> objs = Sampling.sampleWithoutReplacement(trainrecords,
-						samplesize, false, false, new ArrayList<Object>());
-				records = (ArrayList<Record>) objs; // not safe here be
-			}
-            this.initClassifier(this.cltype, this.cloptions);
-			Counter<String> termspace = this
-					.returnFreqDistOnSetOfNgrams(records);
-			if (this.removesinglecount)
-				termspace = KLDivergence.removeSingleCounteTerms(termspace);
-			WekaInstances trainingSet = this.returnIndicatorVectorOfTermSpace(
-					records, termspace.keySet(), true,
-					this.removeCommonCounters, true);
-			List<Double> miss = null;
-			if (testrecords == null) {
-				miss = CommonClassifierRoutines.leaveOneOutCrossValidation(
+		if (initsize == -1) {
+			initsize = trainrecords.size();
+			incsize = 0;
+			maxsize = initsize;
+		}
+		List<Record> sampletrain = trainrecords;
+		for (; initsize <= maxsize ; initsize = initsize + incsize) {
+		    for (int i = 0; i < numtime; i++) {
+			    if (initsize != trainrecords.size()) {
+				    List<?> objs = Sampling.sampleWithoutReplacement(trainrecords,
+						initsize, false, false, new ArrayList<Object>());
+				    sampletrain = (ArrayList<Record>) objs; // not safe here be
+			    }
+                this.initClassifier(this.cltype, this.cloptions);
+			    Counter<String> termspace = this.returnFreqDistOnSetOfNgrams(sampletrain);
+			    if (this.removesinglecount)
+				    termspace = KLDivergence.removeSingleCounteTerms(termspace);
+			    WekaInstances trainingSet = this.returnIndicatorVectorOfTermSpace(
+					    sampletrain, termspace.keySet(), true, this.removeCommonCounters, true);
+			    List<Double> miss = null;
+			    if (testrecords == null) {
+				    miss = CommonClassifierRoutines.leaveOneOutCrossValidation(
 						this.classifier, trainingSet, this.indicesToRemove,
 						this.indicesTodump, null,
 						this.dumpfile);
-			} else {
-				WekaInstances testinstances = this
-						.returnIndicatorVectorOfTermSpace(testrecords,
+			   } else {
+			       WekaInstances testinstances = this.returnIndicatorVectorOfTermSpace(testrecords,
 								termspace.keySet(), true, false, true);
-				this.classifier = CommonClassifierRoutines.trainOnInstances(
+				   this.classifier = CommonClassifierRoutines.trainOnInstances(
 						this.classifier, trainingSet, this.indicesToRemove,
 						null);
-				miss = CommonClassifierRoutines.testInstances(this.classifier,
+				   miss = CommonClassifierRoutines.testInstances(this.classifier,
 						testinstances, 0, this.indicesToRemove,
 						this.indicesToRemove, dumpfile, false);
-			}
-                        int size= 0;
-			if (testrecords == null)
-			    size = samplesize;
-                        else
-                            size = testrecords.size();
-			System.out.println(size + "," + miss.size() + ","
+			    }
+                int testsize= 0;
+			    if (testrecords == null)
+			        size = initsize;
+                else
+                    size = testrecords.size();
+			    System.out.println(initsize +","+size + "," + miss.size() + ","
 					+ StringUtils.join(miss, ","));
-			if (this.dumparff != null) {
-				WekaRoutines.dumpArff(this.dumparff, trainingSet);
-			}
+			    if (this.dumparff != null) {
+				    WekaRoutines.dumpArff(this.dumparff, trainingSet);
+			    }
+		    }
 		}
-
 	}
 
 	public void doLanguageModelWithSampling(int samplesize, int numtime)
