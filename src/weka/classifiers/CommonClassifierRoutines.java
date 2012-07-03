@@ -141,7 +141,7 @@ public final class CommonClassifierRoutines {
 			double result = classifier.classifyInstance(instance);
 			double[] dists = classifier.distributionForInstance(instance) ;
 			String actualClass = instance.stringValue(newInstances.classAttribute());
-			String predictedClass = instances.classAttribute().value((int)result);
+			String predictedClass = newInstances.classAttribute().value((int)result);
 			if (!actualClass.equals(predictedClass))
 			{
 				missclassificationprob.add(dists[(int)result]);  

@@ -89,7 +89,7 @@ public class MedicalTrainer extends Object {
 	private ClassifierType cltype;
 	private boolean languageModel = false;
 	private int minngram = -1;
-	private int samplesize;
+	private int samplesize = -1;
 	private int numIteration;
 	private boolean removeCommonCounters = false;
 	private boolean manualruleset = false;
@@ -270,12 +270,13 @@ public class MedicalTrainer extends Object {
 		if (this.languageModel) {
 			this.doLanguageModelWithSampling(this.samplesize, this.numIteration);
 		} else if (this.manualruleset) {
-			 this.generateRuleFile();
-			//this.doManualClassification();
+		   //	 this.generateRuleFile();
+		   this.termDocMatrix(this.population); 
+		   //this.doManualClassification();
 		} else if (ClassifierType.isWekaClassifer(this.cltype.toString())) {
-			//this.doWekaVaidation(this.population, this.testrecords, 600, 100, 100);
-			this.doWekaClassificationWithSampling(this.samplesize, 30, this.population.size(),
-					this.numIteration, this.population, this.testrecords);
+		    //this.doWekaVaidation(this.population, this.testrecords, 2, 0.05, 0.05);
+		    this.doWekaClassificationWithSampling(this.samplesize, 1 , this.samplesize,
+		    		this.numIteration, this.population, this.testrecords);
 		}
 	}
    
@@ -1381,7 +1382,30 @@ public class MedicalTrainer extends Object {
 		}
 		cv.close();
 	}
-        
+
+        public void termDocMatrix(List<Record> records) throws IOException {
+	    CSVWriter csvwriter = new CSVWriter(new FileWriter(this.dumpfile));
+	    Counter<String> termspace = this.returnFreqDistOnSetOfNgrams(records);
+	    if (this.removesinglecount)
+	        termspace = KLDivergence.removeSingleCounteTerms(termspace);
+	    WekaInstances instances = this.returnIndicatorVectorOfTermSpace(records, termspace.keySet(), true, this.removeCommonCounters, true);
+	    String[] row = new String[instances.numAttributes()];		
+            for (int i = 0; i < instances.numAttributes(); i++) {
+	        row[i] = instances.attribute(i).name(); 
+	    }
+	    csvwriter.writeNext(row);
+	    for (Instance instance : instances) {
+	        for (int i = 0; i < instances.numAttributes(); i++) {
+                    if (instance.attribute(i).isNumeric())
+                        row[i] =""+  instance.value(i);
+                    else
+			row[i] = instance.toString(i);
+	        }
+	    csvwriter.writeNext(row);
+	    }
+	    csvwriter.close();
+        }
+
 	public void doWekaVaidation(List<Record> trainrecords, List<Record> testrecords, 
 			double maxvalue, double stepsize, double initial)
 			throws Exception {
@@ -1395,10 +1419,11 @@ public class MedicalTrainer extends Object {
         WekaInstances testinstances = this.returnIndicatorVectorOfTermSpace(testrecords,
 				termspace.keySet(), true, false, true);
         double miscount = testrecords.size();
+        System.out.println("train size "+ trainrecords.size() +  " test size "+testrecords.size());
         String minoption = this.cloptions[1];
 		for (double i = initial; i < maxvalue; i = i + stepsize) {
-			this.cloptions[1] = ""+(int)i;
-            this.initClassifier(this.cltype, this.cloptions);
+			this.cloptions[1] = ""+i;
+                        this.initClassifier(this.cltype, this.cloptions);
 			this.classifier = CommonClassifierRoutines.trainOnInstances(
 					this.classifier, trainingSet, this.indicesToRemove,
 					null);
@@ -1409,6 +1434,9 @@ public class MedicalTrainer extends Object {
 				miscount = miss.size();
 				minoption = this.cloptions[1];
 			}
+                        else {
+			    System.out.println("no improvement option size "+ i + " error size "+ miss.size());
+			} 
 		}
         System.out.println("option "+ minoption + " misscalssification "+ miscount);
 	}
@@ -1423,21 +1451,22 @@ public class MedicalTrainer extends Object {
 		}
 		return testset;
 	}
+
 	public void doWekaClassificationWithSampling(int initsize, int incsize, int maxsize,  int numtime,
 			List<Record> trainrecords, List<Record> testrecords)
 			throws Exception {
 
 		if (initsize == -1) {
 			initsize = trainrecords.size();
-			incsize = 0;
+			incsize = 1;
 			maxsize = initsize;
 		}
 		List<Record> sampletrain = trainrecords;
-		for (; initsize <= maxsize ; initsize = initsize + incsize) {
+		for (; initsize <=  maxsize ; initsize = initsize + incsize) {
 		    for (int i = 0; i < numtime; i++) {
 			    if (initsize != trainrecords.size()) {
 				    List<?> objs = Sampling.sampleWithoutReplacement(trainrecords,
-						initsize, false, false, new ArrayList<Object>());
+						initsize, true, true, new ArrayList<Object>());
 				    sampletrain = (ArrayList<Record>) objs; // not safe here be
 			    }
                 this.initClassifier(this.cltype, this.cloptions);
