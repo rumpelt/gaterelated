@@ -1,13 +1,10 @@
 /**
  * 
  */
-package json;
-
-import gate.creole.annic.Constants;
+package yelpacad;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
@@ -16,25 +13,26 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.LowerCaseFilter;
-import org.apache.lucene.analysis.LowerCaseTokenizer;
-import org.apache.lucene.analysis.PorterStemFilter;
-import org.apache.lucene.analysis.StopAnalyzer;
-import org.apache.lucene.analysis.StopFilter;
-import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.store.MMapDirectory;
+import org.apache.lucene.util.Version;
+import org.apache.lucene.analysis.core.LowerCaseTokenizer;
+import org.apache.lucene.analysis.core.StopAnalyzer;
+import org.apache.lucene.analysis.core.StopFilter;
+import org.apache.lucene.analysis.en.PorterStemFilter;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.NumericField;
+import org.apache.lucene.document.FloatDocValuesField;
+import org.apache.lucene.document.FloatField;
+import org.apache.lucene.document.IntDocValuesField;
+import org.apache.lucene.document.LongDocValuesField;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.store.SimpleFSDirectory;
-import org.apache.lucene.util.Version;
-import tokenizers.LucenePTBTokenizer;
-import tokenizers.StopWordList;
-
+import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.document.Field;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -48,29 +46,26 @@ public class YelpAcadJson {
 	public static class YelpAnalyzer extends Analyzer {
 
 		/* (non-Javadoc)
-		 * @see org.apache.lucene.analysis.Analyzer#tokenStream(java.lang.String, java.io.Reader)
+		 * @see org.apache.lucene.analysis.nalyzer#tokenStream(java.lang.String, java.io.Reader)
 		 */
     	private Version versionNumber;
     	public YelpAnalyzer(Version versionNumber) {
     		this.versionNumber  = versionNumber;
     	}
+	
+		/* (non-Javadoc)
+		 * @see org.apache.lucene.analysis.Analyzer#createComponents(java.lang.String, java.io.Reader)
+		 */
 		@Override
-		public TokenStream tokenStream(String arg0, Reader arg1) {
-		    return new StopFilter(this.versionNumber , 
-					new PorterStemFilter(new LowerCaseTokenizer(this.versionNumber , arg1)) , 
+		protected TokenStreamComponents createComponents(String fieldname,
+				Reader reader) {
+			// TODO Auto-generated method stub
+			Tokenizer tokenizer = new LowerCaseTokenizer(this.versionNumber , reader);
+			TokenStream tokenstream = new StopFilter(this.versionNumber , 
+					new PorterStemFilter(tokenizer) , 
 					StopAnalyzer.ENGLISH_STOP_WORDS_SET);
-		
-		}
-		@Override
-		public TokenStream reusableTokenStream(String fieldName, Reader reader) throws
-		IOException{
-			Tokenizer tokenizer = (Tokenizer)getPreviousTokenStream();
-			if (tokenizer == null) {
-				return tokenStream(fieldName, reader);
-			}
-			else
-				tokenizer.reset(reader);
-			return tokenizer;
+			
+			return new Analyzer.TokenStreamComponents(tokenizer ,tokenstream);
 		}
     	
     }
@@ -108,72 +103,96 @@ public class YelpAcadJson {
 		FileReader fr = new FileReader(new File(filename));
 		BufferedReader br = new BufferedReader(fr);
 		String line = null;
-		Analyzer analyzer = new YelpAnalyzer(Version.LUCENE_36);
-		IndexWriterConfig conf = new IndexWriterConfig(Version.LUCENE_36, analyzer);
+		Analyzer analyzer = new YelpAnalyzer(Version.LUCENE_40);
+		IndexWriterConfig conf = new IndexWriterConfig(Version.LUCENE_40, analyzer);
 		if (newindex)
 			conf.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
 		else
 			conf.setOpenMode(IndexWriterConfig.OpenMode.APPEND);
-		SimpleFSDirectory directory = new SimpleFSDirectory(new File(indexdir));
+		MMapDirectory directory = new MMapDirectory(new File(indexdir));
 		IndexWriter indexwriter = new IndexWriter(directory, conf);
 	
 		while((line = br.readLine()) != null) {
 			Document doc = new Document();
 			YelpObject yelpobject = getYelpObject(line);
-			doc.add(new Field("type", false, yelpobject.type,Field.Store.YES, Field.Index.NO, Field.TermVector.NO) );
+			doc.add(new StringField("type", yelpobject.type,Field.Store.NO));
 			if (yelpobject.business_id != null)
-				doc.add(new Field("business_id", false, yelpobject.business_id ,Field.Store.YES, Field.Index.NO, Field.TermVector.NO));
+				doc.add(new StringField("business_id", yelpobject.business_id ,Field.Store.NO));
 			if (yelpobject.full_address != null)
-				doc.add(new Field("full_address", false, yelpobject.full_address ,Field.Store.NO, Field.Index.ANALYZED_NO_NORMS, Field.TermVector.YES));
+				doc.add(new TextField("full_address", yelpobject.full_address ,Field.Store.NO));
 			if (yelpobject.name != null)
-			    doc.add(new Field("name", false, yelpobject.name ,Field.Store.NO, Field.Index.ANALYZED_NO_NORMS, Field.TermVector.YES));
+			    doc.add(new StringField("name", yelpobject.name ,Field.Store.NO));
 			if(yelpobject.neighborhoods.size() >0  ) {
-				for (String neig :yelpobject.neighborhoods )
-				doc.add(new Field("neighborhoods", false, neig ,Field.Store.NO,Field.Index.ANALYZED_NO_NORMS, Field.TermVector.YES));
+				for (String neig :yelpobject.neighborhoods ) {
+					if (doc.getField("neighborhoods") == null)
+						doc.add(new TextField("neighborhoods",neig ,Field.Store.NO));
+					else {
+						IndexableField f = doc.getField("neighborhoods");
+						String s = f.stringValue();
+						doc.removeField("neighborhoods");
+						doc.add(new TextField("neighborhoods",s + " "+ neig ,Field.Store.NO));
+					}
+				}
 			}
 			if (yelpobject.city != null)
-				doc.add(new Field("city", false, yelpobject.city ,Field.Store.NO, Field.Index.ANALYZED_NO_NORMS, Field.TermVector.YES));
+				doc.add(new StringField("city", yelpobject.city ,Field.Store.NO));
 			if (yelpobject.state != null)
-				doc.add(new Field("state", false, yelpobject.state ,Field.Store.NO, Field.Index.ANALYZED_NO_NORMS, Field.TermVector.YES));
+				doc.add(new StringField("state", yelpobject.state ,Field.Store.NO));
 			if (yelpobject.latitude != null) 
-				doc.add(new NumericField("latitude", Field.Store.YES, false).setFloatValue(yelpobject.latitude));
+				doc.add(new FloatField("latitude", yelpobject.latitude, Field.Store.NO));
 			if (yelpobject.longitude != null) 
-				doc.add(new NumericField("longitude", Field.Store.YES, false).setFloatValue(yelpobject.longitude));
+				doc.add(new FloatField("longitude", yelpobject.longitude, Field.Store.NO));
 			if (yelpobject.stars != null) 
-				doc.add(new NumericField("stars", Field.Store.YES, false).setFloatValue(yelpobject.stars));
+				doc.add(new FloatDocValuesField("stars",yelpobject.stars));
 			if (yelpobject.review_count != null) 
-				doc.add(new NumericField("review_count", Field.Store.YES, false).setIntValue(yelpobject.review_count));
+				doc.add(new IntDocValuesField("review_count", yelpobject.review_count));
 			if (yelpobject.photourl != null) 
-				doc.add(new Field("photourl", false, yelpobject.photourl ,Field.Store.YES, Field.Index.NO, Field.TermVector.NO));
+				doc.add(new StringField("photourl", yelpobject.photourl ,Field.Store.NO));
 			if(yelpobject.categories.size() >0  ) {
-				for (String cat :yelpobject.categories )
-				doc.add(new Field("categories", false, cat ,Field.Store.NO,Field.Index.ANALYZED_NO_NORMS, Field.TermVector.YES));
+				for (String cat :yelpobject.categories ) {
+					if (doc.getField("categories") == null)
+						doc.add(new TextField("categories",cat ,Field.Store.NO));
+					else {
+						IndexableField f = doc.getField("categories");
+						String s = f.stringValue();
+						doc.removeField("categories");
+						doc.add(new TextField("categories",s + " "+ cat ,Field.Store.NO));
+					}
+				}
 			}
-					
+			
 			if (yelpobject.open != null) 
-		            doc.add(new Field("open", false, yelpobject.open.toString() ,Field.Store.YES, Field.Index.NO, Field.TermVector.NO));
+		            doc.add(new StringField("open", yelpobject.open.toString() ,Field.Store.NO));
 			if(yelpobject.schools.size() >0  ) {
-				for (String sch :yelpobject.schools )
-				doc.add(new Field("schools", false, sch ,Field.Store.NO,Field.Index.ANALYZED_NO_NORMS, Field.TermVector.YES));
+				for (String sc :yelpobject.schools ) {
+					if (doc.getField("schools") == null)
+						doc.add(new TextField("schools",sc ,Field.Store.NO));
+					else {
+						IndexableField f = doc.getField("schools");
+						String s = f.stringValue();
+						doc.removeField("schools");
+						doc.add(new TextField("schools",s + " "+ sc ,Field.Store.NO));
+					}
+				}
 			}
 			if (yelpobject.url != null) 
-				doc.add(new Field("url", false, yelpobject.url ,Field.Store.YES, Field.Index.NO, Field.TermVector.NO));
+				doc.add(new StringField("url", yelpobject.url ,Field.Store.NO));
 			if (yelpobject.user_id != null) 
-				doc.add(new Field("user_id", false, yelpobject.user_id ,Field.Store.YES, Field.Index.NO, Field.TermVector.NO));
+				doc.add(new StringField("user_id", yelpobject.user_id ,Field.Store.NO));
 			if (yelpobject.text != null) 
-				doc.add(new Field("text", false, yelpobject.text ,Field.Store.NO, Field.Index.ANALYZED, Field.TermVector.WITH_POSITIONS_OFFSETS));
+				doc.add(new TextField("text", yelpobject.text ,Field.Store.NO));
 
 			if (yelpobject.average_stars != null) 
-	                    doc.add(new NumericField("average_stars", Field.Store.YES, false).setFloatValue(yelpobject.average_stars));
+	                    doc.add(new FloatDocValuesField("average_stars", yelpobject.average_stars));
 
 			SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
 			if (yelpobject.date != null)  {
 				Date dt = formatter.parse(yelpobject.date);
-				doc.add(new NumericField("date", Field.Store.YES, false).setLongValue(dt.getTime()));
+				doc.add(new LongDocValuesField("date", dt.getTime()));
 			}
 			if(yelpobject.votes.size() >0  ) {
 				for (String key : yelpobject.votes.keySet())
-					doc.add(new NumericField(key, Field.Store.YES, false).setIntValue(yelpobject.votes.get(key)));
+					doc.add(new IntDocValuesField(key, yelpobject.votes.get(key)));
 			}
 			indexwriter.addDocument(doc);
 		}

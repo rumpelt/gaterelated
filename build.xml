@@ -5,7 +5,9 @@
     <property environment="env"/>
     <property name="build" location="build"/>
     <property name="dist" location="dist"/> 
+    <property name="classpath" location="/usa/arao/jar"/>
     <property name="src" location="src"/>
+
     <path id="gaterelated.dist">
     	<fileset dir="./dist/lib">
     	   <include name="*.jar"/>
@@ -19,18 +21,17 @@
  	</fileset>
     </path>	
     <target name="init">
-       <tstamp/>
        <mkdir dir="${build}"/>
        <mkdir dir="${dist}"/>
     </target>
     <target name="compile" depends="init" description="compile the whole damnn thing">
-        <javac 	srcdir="${src}" destdir="${build}" debug="true" debuglevel="lines,vars,source">
+        <javac 	srcdir="${src}" excludes="yelpacad/**" destdir="${build}" debug="true" debuglevel="lines,vars,source">
            <classpath refid="gaterelated.classpath"/>
         </javac>
     </target>
     <target name="dist" depends="compile">
-	<mkdir dir="${dist}/lib"/>
-	<jar jarfile="${dist}/lib/gaterelated-${DSTAMP}.jar" basedir="${build}"/>
+        <mkdir dir="${dist}/lib"/>
+	<jar jarfile="${dist}/lib/gaterelated.jar" basedir="${build}"  />
     </target>
     <target name="clean"  description="clean the project">
         <delete dir="${build}"/>
@@ -42,4 +43,24 @@
     	    <classpath refid="gaterelated.dist"/>
     	 </java>
     </target>
+  
+   <target name="compileyelpacadjson" depends="init" description="compiling the YelpAcadJson to index the yelp acad dataset">
+       <javac srcdir="${src}" destdir="${build}" includes="yelpacad/**" debug="true" debuglevel="lines,vars,source">
+           <classpath>
+               <pathelement location="${classpath}/lucene4/lucene-core-4.0.0-ALPHA.jar"/>
+               <pathelement location="${classpath}/gson-2.2.1.jar"/>
+               <pathelement location="${classpath}/lucene4/lucene-analyzers-common-4.0.0-ALPHA.jar"/>
+            </classpath>
+       </javac>
+   </target>
+   <target name="yelpacad" depends="compileyelpacadjson">
+       <mkdir dir="${dist}/lib"/>
+       <jar jarfile="${dist}/lib/yelpacad.jar" basedir="${build}" includes="yelpacad/**"/>
+   </target>
+  <target name="clean-yelpacad" description="clean the yelp acad project">
+      <delete dir="${build}/yelpacad"/>  
+      <delete>
+          <fileset file="${dist}/lib/yelpacad.jar"/>
+      </delete>
+  </target>
 </project>
