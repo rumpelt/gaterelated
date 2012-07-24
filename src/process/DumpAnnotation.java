@@ -28,7 +28,8 @@ import gate.util.InvalidOffsetException;
 
 /**
  * @author ashwani
- * Very very specific file . Not suitable for general purpose
+ * Very very specific file . 
+ * Not suitable for general purpose
  */
 public class DumpAnnotation implements LanguageAnalyser {
 	private FeatureMap features;
@@ -206,6 +207,16 @@ public class DumpAnnotation implements LanguageAnalyser {
 				AnnotationSet orig = doc.getAnnotations(this.defaultAnn);
 				SortedAnnotationList fields = new SortedAnnotationList();
 				SortedAnnotationList tatts = new SortedAnnotationList();
+				
+				for (Annotation a : orig) {
+					if(a.getType().equalsIgnoreCase("TIMEBASEDATTRIBUTE")) {
+						float age = Float.parseFloat((String)a.getFeatures().get("age"));
+						if (age >= lowage && age <= upage) {
+							tatts.add(a);
+						}
+					}
+				}
+				
 				String identifier = null;
 				for (Annotation a : orig) {
 					if (identifier == null && a.getType().equalsIgnoreCase("ATTRIBUTES"))
@@ -213,13 +224,6 @@ public class DumpAnnotation implements LanguageAnalyser {
 						if (a.getFeatures().get("name").equals("MRN")) {
 							identifier = doc.getContent().getContent(
 									a.getStartNode().getOffset(), a.getEndNode().getOffset()).toString();
-						}
-					}
-						
-					if(a.getType().equalsIgnoreCase("TIMEBASEDATTRIBUTE")) {
-						float age = Float.parseFloat((String)a.getFeatures().get("age"));
-						if (age >= lowage && age <= upage) {
-							tatts.add(a);
 						}
 					}
 					
