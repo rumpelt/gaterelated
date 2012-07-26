@@ -159,7 +159,21 @@ public class DumpAnnotation implements LanguageAnalyser {
 		// TODO Auto-generated method stub
 		return (String) this.parameters.get("name");
 	}
-
+	/** This function is when there is progress note information for the
+	 * baby but the corresponding field was not found in the notes.
+	 * Such situation can arise if the field in not in the notes or we have 
+	 * specified wrong regular expression for the field.
+	 * We wnat to do dump such babies to find out how many such babies we have. 
+	 */
+    private void dumpNoInformation(String id, List<Annotation> anns) {
+    	String[] row = new String[3];
+		row[0] = id;
+		for (Annotation a: anns) {
+			row[1] = (String)a.getFeatures().get("age");
+			row[2] = "";
+			this.fwriter.writeNext(row);
+		}
+    }
 	private void dumptoFile(String identifier , List<Annotation> anns, Document doc) {
 		try {
 			String[] row = new String[3];
@@ -242,6 +256,8 @@ public class DumpAnnotation implements LanguageAnalyser {
 				}
 				if (fields.size() > 0)
 					this.dumptoFile(identifier , fields, doc);
+				else if (tatts.size() > 0)
+					this.dumpNoInformation(identifier ,tatts);
 			}
 		}
 		catch (InvalidOffsetException e) {
