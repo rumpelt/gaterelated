@@ -117,12 +117,12 @@ public final class CommonClassifierRoutines {
 	 * @throws Exception
 	 */
 	
-	public  static ArrayList<Double> testInstances(AbstractClassifier classifier,
+	public  static ClassifierResult testInstances(AbstractClassifier classifier,
 			Instances instances, int indexOfId,	int[] indicesToDelete,
 			int[] indicesToDump,String dumpfile , boolean dumpEverything) 
 	throws Exception {
-		double missclassified = 0;
-        ArrayList<Double> missclassificationprob = new ArrayList<Double>();
+		
+                ClassifierResult clresult = new ClassifierResult();
 
 		Remove rm = null;
 		Instances newInstances = instances;
@@ -143,13 +143,10 @@ public final class CommonClassifierRoutines {
 			String actualClass = instance.stringValue(newInstances.classAttribute());
 			String predictedClass = newInstances.classAttribute().value((int)result);
 			if (!actualClass.equals(predictedClass))
-			{
-				missclassificationprob.add(dists[(int)result]);  
-				missclassified++;
-				//System.out.println(instances.get(count).value(indexOfId) +": "
-				//		+instance.classAttribute().value((int)result));
-			}
-		
+		            clresult.addWrongResult(dists[(int)result],"-1"); 
+		        else
+                            clresult.addCorrectResult(dists[(int)result],"-1"); 
+                		
 			if (csvWriter != null) {
 				String[] dump = new String[indicesToDump.length+2];
 				for (int cnt = 0; cnt < dump.length; cnt++)
@@ -177,7 +174,7 @@ public final class CommonClassifierRoutines {
 		}
 		if (csvWriter != null)
 			csvWriter.close();
-		return missclassificationprob;
+		return clresult;
 	}
 	
 
@@ -204,11 +201,11 @@ public final class CommonClassifierRoutines {
 	
 
 	
-	public static List<Double> leaveOneOutCrossValidation(AbstractClassifier classifier ,
+	public static ClassifierResult leaveOneOutCrossValidation(AbstractClassifier classifier ,
 			Instances instances, int[] indicesTORemove, int [] indicesToPrint,
 			String[] options, String dumpfile) throws Exception {
-		double missclassified = 0;
-                ArrayList<Double> missclassificationprob = new ArrayList<Double>();
+		
+                ClassifierResult clresult = new ClassifierResult();
 		Instances copied = instances;
 		if (indicesTORemove != null)
 			copied = CommonClassifierRoutines.removeAttributes(instances, indicesTORemove);
@@ -237,12 +234,13 @@ public final class CommonClassifierRoutines {
 			
 			dump[dumpind++] = instances.get(i).stringValue(instances.classAttribute());
 			dump[dumpind++] = instances.classAttribute().value((int)result);
-			if (dump[dumpind-1].equals(dump[dumpind-2]))
+			if (dump[dumpind-1].equals(dump[dumpind-2])) {
 				dump[dumpind++] = "1";
+                                clresult.addCorrectResult(dists[(int)result],"-1");
+			}
 			else {
-				dump[dumpind++] = "0";
-                                missclassificationprob.add(dists[(int)result]);  
-				missclassified++;
+			    dump[dumpind++] = "0";
+                            clresult.addWrongResult(dists[(int)result], "-1");
 			}
 			for (double val : dists)
 				dump[dumpind++] = new String(""+val);
@@ -251,6 +249,6 @@ public final class CommonClassifierRoutines {
 		}
 		if (csvWriter != null)
 			csvWriter.close();
-		return missclassificationprob;
+		return clresult;
 	}
 }

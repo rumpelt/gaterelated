@@ -53,6 +53,7 @@ import weka.WekaRoutines;
 import weka.classifiers.AbstractClassifier;
 import weka.classifiers.ClassifierType;
 import weka.classifiers.CommonClassifierRoutines;
+import weka.classifiers.ClassifierResult;
 import weka.classifiers.Evaluation;
 import weka.classifiers.J48Classifier;
 import weka.classifiers.bayes.NaiveBayesMultinomial;
@@ -276,7 +277,7 @@ public class MedicalTrainer extends Object {
 		} else if (ClassifierType.isWekaClassifer(this.cltype.toString())) {
 		    //this.doWekaVaidation(this.population, this.testrecords, 2, 0.05, 0.05);
 		    this.doWekaClassificationWithSampling(this.samplesize, 1 , this.samplesize,
-		    		this.numIteration, this.population, this.testrecords);
+							  this.numIteration, this.population, this.testrecords, false);
 		}
 	}
    
@@ -804,7 +805,7 @@ public class MedicalTrainer extends Object {
 			}
 
 			for (int ngram : this.ngramsToGet) {
-				Set<String> terms = this.returnUniqueNgramTermspace(
+				List<String> terms = this.returnTokens(
 						record.getText(), ngram, removeCommonCounters);
 				IntCounter<String> termcounts = null;
 				if (actualcount) {
@@ -1110,6 +1111,7 @@ public class MedicalTrainer extends Object {
 						record.getText(), ngram, this.removeCommonCounters),
 						record.getTextcategory());
 			}
+                        md.printProbOfWordGivenClass();
 			models.add(md);
 		}
 
@@ -1427,15 +1429,15 @@ public class MedicalTrainer extends Object {
 			this.classifier = CommonClassifierRoutines.trainOnInstances(
 					this.classifier, trainingSet, this.indicesToRemove,
 					null);
-			List<Double> miss = CommonClassifierRoutines.testInstances(this.classifier,
+			ClassifierResult clresult = CommonClassifierRoutines.testInstances(this.classifier,
 						testinstances, 0, this.indicesToRemove,
 						this.indicesToRemove, dumpfile, false);
-			if (miss.size() < miscount) {
-				miscount = miss.size();
+			if (clresult.getWrongprob().size() < miscount) {
+			    miscount = clresult.getWrongprob().size();
 				minoption = this.cloptions[1];
 			}
                         else {
-			    System.out.println("no improvement option size "+ i + " error size "+ miss.size());
+			    System.out.println("no improvement option size "+ i + " error size "+ clresult.getWrongprob().size());
 			} 
 		}
         System.out.println("option "+ minoption + " misscalssification "+ miscount);
@@ -1451,9 +1453,17 @@ public class MedicalTrainer extends Object {
 		}
 		return testset;
 	}
-
+    
+        public List<Record> returnRestRecords(List<Record> population, List<Record> rmRecords) {
+                ArrayList<Record> testset = new ArrayList<Record>();
+ 		for (Record record : population) {
+	            if (!rmRecords.contains(record))
+			testset.add(record);
+		}
+		return testset;
+        }
 	public void doWekaClassificationWithSampling(int initsize, int incsize, int maxsize,  int numtime,
-			List<Record> trainrecords, List<Record> testrecords)
+						     List<Record> trainrecords, List<Record> testrecords, boolean createtestset)
 			throws Exception {
 
 		if (initsize == -1) {
@@ -1464,43 +1474,49 @@ public class MedicalTrainer extends Object {
 		List<Record> sampletrain = trainrecords;
 		for (; initsize <=  maxsize ; initsize = initsize + incsize) {
 		    for (int i = 0; i < numtime; i++) {
-			    if (initsize != trainrecords.size()) {
-				    List<?> objs = Sampling.sampleWithoutReplacement(trainrecords,
-						initsize, true, true, new ArrayList<Object>());
-				    sampletrain = (ArrayList<Record>) objs; // not safe here be
+			if (initsize != trainrecords.size()) {
+			    List<?> objs = Sampling.sampleWithoutReplacement(trainrecords,
+					initsize, true, true, new ArrayList<Object>());
+			    sampletrain = (ArrayList<Record>) objs; // not safe here be
+                            if (createtestset)
+                                testrecords = this.returnRestRecords(trainrecords, sampletrain);
+ 
 			    }
-                this.initClassifier(this.cltype, this.cloptions);
-			    Counter<String> termspace = this.returnFreqDistOnSetOfNgrams(sampletrain);
-			    if (this.removesinglecount)
-				    termspace = KLDivergence.removeSingleCounteTerms(termspace);
-			    WekaInstances trainingSet = this.returnIndicatorVectorOfTermSpace(
+                        this.initClassifier(this.cltype, this.cloptions);
+		    	Counter<String> termspace = this.returnFreqDistOnSetOfNgrams(sampletrain);
+			if (this.removesinglecount)
+			    termspace = KLDivergence.removeSingleCounteTerms(termspace);
+			
+                        WekaInstances trainingSet = this.returnIndicatorVectorOfTermSpace(
 					    sampletrain, termspace.keySet(), true, this.removeCommonCounters, true);
-			    List<Double> miss = null;
-			    if (testrecords == null) {
-				    miss = CommonClassifierRoutines.leaveOneOutCrossValidation(
-						this.classifier, trainingSet, this.indicesToRemove,
-						this.indicesTodump, null,
-						this.dumpfile);
-			   } else {
-			       WekaInstances testinstances = this.returnIndicatorVectorOfTermSpace(testrecords,
-								termspace.keySet(), true, false, true);
-				   this.classifier = CommonClassifierRoutines.trainOnInstances(
+			ClassifierResult clresult = null;
+			if (testrecords == null) {
+			    clresult = CommonClassifierRoutines.leaveOneOutCrossValidation(
+					this.classifier, trainingSet, this.indicesToRemove,
+					this.indicesTodump, null,
+					this.dumpfile);
+			} else {
+			    WekaInstances testinstances = this.returnIndicatorVectorOfTermSpace(testrecords,
+							termspace.keySet(), true, false, true);
+			    this.classifier = CommonClassifierRoutines.trainOnInstances(
 						this.classifier, trainingSet, this.indicesToRemove,
 						null);
-				   miss = CommonClassifierRoutines.testInstances(this.classifier,
+			    clresult = CommonClassifierRoutines.testInstances(this.classifier,
 						testinstances, 0, this.indicesToRemove,
 						this.indicesToRemove, dumpfile, false);
-			    }
-                int size= 0;
-			    if (testrecords == null)
-			        size = initsize;
-                else
-                    size = testrecords.size();
-			    System.out.println(initsize +","+size + "," + miss.size() + ","
-					+ StringUtils.join(miss, ","));
-			    if (this.dumparff != null) {
-				    WekaRoutines.dumpArff(this.dumparff, trainingSet);
-			    }
+			 }
+                          int size= 0;
+			  if (testrecords == null)
+			      size = initsize;
+                          else
+			      size = testrecords.size();
+                          System.out.println("0" + ","+initsize +","+size + "," + clresult.getWrongprob().size() + ","
+		        	       + StringUtils.join(clresult.getWrongprob(), ","));
+                          System.out.println("1" + ","+initsize +","+size + "," + clresult.getCorrectprob().size() + ","
+				       + StringUtils.join(clresult.getCorrectprob(), ","));
+			  if (this.dumparff != null) {
+			      WekaRoutines.dumpArff(this.dumparff, trainingSet);
+			 }
 		    }
 		}
 	}
@@ -1610,7 +1626,7 @@ public class MedicalTrainer extends Object {
 				training.clear();
 				Instance testinstance = this.testInstanceOnLanguageModel(
 						records, container, training, docid);
-				if (!CommonClassifierRoutines.testInstances(classifier,
+				if (CommonClassifierRoutines.testInstances(classifier,
 						testinstance, training, new int[] { 0, 1 })) {
 					missclassifier++;
 					System.out.println(training.classAttribute());

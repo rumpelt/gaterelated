@@ -12,7 +12,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-
+import java.util.HashSet;
 import au.com.bytecode.opencsv.CSVWriter;
 
 
@@ -64,7 +64,22 @@ public class MultinomialDocumentModel {
 	}
         
        
-	
+        public void printProbOfWordGivenClass() {
+	    HashSet<String> words = new HashSet<String>();
+	    for (String topic : this.getTopics()) {
+	        words.addAll(this.getVocab(topic));
+	        System.out.print(topic+" ");
+	    }
+	    System.out.println("");
+	    for (String term : words) {
+                System.out.print(term + " ");
+	        for (String topic : this.getTopics()) {        
+		    System.out.print(this.getProbabilityOfWordGivenClass(term, topic, this.getVocab(topic))+" ");
+	        }
+	        System.out.println();
+	    }
+        }
+
 	public String printGlobalCounter(boolean ascending) {
 		IntCounter<String> global = this.createGlobalCounter();
 		StringBuilder sb = new StringBuilder();
