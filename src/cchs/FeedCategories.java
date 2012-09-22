@@ -18,7 +18,9 @@ public  enum FeedCategories {
 	BOTTLE_FED_BREAST_MILK("bottle fed breast milk"),
     BOTTLE_FED_BREAST_MILK_SOME_FORMULA("bottle fed breast milk some formula"),
     BREAST_WITH_MINIMAL_SUPPLIMENT("breast with minimal suppliment"),
-    
+    TUBE("TUBE"),
+    CEREAL("cereal"),
+    FRUIT("fruit"),
 	BREAST_AND_NO_INFORMATION_ON_CEREALS("breast and no information on cereals"),
 	BOTTLE_AND_NO_INFORMATION_ON_CEREALS("bottle and no information on cereals"),
 	BREAST_AND_BOTTLE_AND_NO_INFORMATION_ON_CEREALS("breast and bottle and no information on cereals"),

@@ -9,9 +9,6 @@ import java.io.File;
 import java.io.IOException;
 
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
 
 import weka.clusterers.ClusterEvaluation;
 import weka.clusterers.Clusterer;
@@ -28,7 +25,7 @@ import weka.core.converters.ArffSaver;
  *
  */
 public class WekaRoutines {
-	static Logger logger = Logger.getLogger(WekaRoutines.class.getName());
+//	static Logger logger = Logger.getLogger(WekaRoutines.class.getName());
 	
 	/**
 	 * Routine to dump the file in arff format.
@@ -44,7 +41,7 @@ public class WekaRoutines {
 	}
 	
 	
-	
+	/*
 	
 	public static void assignClusterToEachInstance(Clusterer clusterer, Instances instances) {
 		for (Instance instance : instances) {
@@ -65,9 +62,9 @@ public class WekaRoutines {
 		}
 	}
 	
-
+*/
 	public static Clusterer kmeanclusterexecution(Instances instances) {
-		logger.setLevel(Level.INFO);
+	//	logger.setLevel(Level.INFO);
 		SimpleKMeans kmean = new SimpleKMeans();
 		try {
 			CosineDistanceMeasure dm = new CosineDistanceMeasure();
@@ -84,7 +81,7 @@ public class WekaRoutines {
 			
 			String a = eval.clusterResultsToString();
 			System.out.println(a);
-			logger.info(a);
+		//	logger.info(a);
 			
 		} catch (Exception e) {
 			// TODO Auto-generated catch block

@@ -32,3 +32,8 @@ of things will be dumped.
 
 Also you can look the comment section of the custom made processing file
 to see the run time parameters required
+
+4. --controllertype=serialAnalyserController  --dir=/home/ashwani/xyz/pvdatastore  
+--processes="process.DumpAnnotation"  --pparams=" -process.DumpAnnotation         
+name:justlikethat dump_file:/home/ashwani/xyz/questionfeeding.csv low_age:0 up_age:8.0 
+fieldtype:((feed[a-z]{0,4})|(appetite))\s*[?]$"

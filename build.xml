@@ -63,4 +63,6 @@
           <fileset file="${dist}/lib/yelpacad.jar"/>
       </delete>
   </target>
+  <target name="gate" depends="init" description="compile the gate related files">
+  </target>
 </project>

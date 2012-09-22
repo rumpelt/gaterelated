@@ -14,8 +14,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.apache.lucene.analysis.CharArraySet;
-import org.apache.lucene.analysis.StopAnalyzer;
+import org.apache.lucene.analysis.core.StopAnalyzer;
+import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.util.Version;
 
 import specialstruct.StringCounter;
@@ -128,15 +128,16 @@ public final class StopWordList {
 		String[] row = null;
 		while ((row = reader.readNext()) != null) {
 			String text = row[0];
-			if (row[2] == null)
+			if ( row[4] == null)
 				continue;
-			String category = row[2].trim();
+			String category = row[4].trim();
 			if (category.length() <= 0)
 				continue;
 			StringCounter cntr = new StringCounter();
 			for(String s : text.split("\\s+")) {
 				cntr.incrementCount(s);
 			}
+			System.out.println(row[0] + row[4]);
 			map.put(cntr, FeedCategories.getValueOf(category));
 		}
 		return map;

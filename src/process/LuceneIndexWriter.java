@@ -3,6 +3,8 @@
  */
 package process;
 
+import indexreader.SimpleAnalyzer;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
@@ -12,19 +14,12 @@ import java.util.Set;
 import java.util.Vector;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.LowerCaseFilter;
-import org.apache.lucene.analysis.StopAnalyzer;
-import org.apache.lucene.analysis.StopFilter;
 import org.apache.lucene.analysis.Tokenizer;
-import org.apache.lucene.analysis.WhitespaceTokenizer;
 import org.apache.lucene.analysis.standard.StandardFilter;
 import org.apache.lucene.analysis.standard.StandardTokenizer;
-import org.apache.lucene.analysis.PorterStemFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Field;
-import org.apache.lucene.document.Fieldable;
-import org.apache.lucene.document.NumericField;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.store.SimpleFSDirectory;
@@ -51,7 +46,7 @@ import gate.util.InvalidOffsetException;
  * @author ashwani
  * Index creation using lucene for custome made for my data set of child records.
  */
-public class LuceneIndexWriter implements LanguageAnalyser{
+public abstract class LuceneIndexWriter implements LanguageAnalyser{
 	private FeatureMap features;
 	/**
 	 * required parameters are  as following.
@@ -90,11 +85,12 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 	/* (non-Javadoc)
 	 * @see gate.Resource#cleanup()
 	 */
+	
 	@Override
 	public void cleanup() {
 		// TODO Auto-generated method stub
 		try {
-			this.indexwriter.optimize();
+	//		this.indexwriter.optimize();
 			this.indexwriter.close();
 		} catch (CorruptIndexException e) {
 			// TODO Auto-generated catch block
@@ -104,44 +100,6 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 			e.printStackTrace();
 		}
 	}
-    public static class MedicalRecordAnalyzer extends Analyzer {
-
-		/* (non-Javadoc)
-		 * @see org.apache.lucene.analysis.Analyzer#tokenStream(java.lang.String, java.io.Reader)
-		 */
-    	private Version versionNumber;
-    	public MedicalRecordAnalyzer(Version versionNumber) {
-    		this.versionNumber  = versionNumber;
-    	}
-		@Override
-		public TokenStream tokenStream(String arg0, Reader arg1) {
-			// TODO Auto-generated method stub
-			return new StopFilter(this.versionNumber,
-					new LowerCaseFilter(this.versionNumber, 
-					new LucenePTBTokenizer(arg1)), StopWordList.getCchsStopWordList(this.versionNumber), true);
-			/*
-			return new StopFilter(true,
-					new PorterStemFilter(
-							new LowerCaseFilter(
-									new StandardFilter(
-											new StandardTokenizer(
-													this.versionNumber, arg1)))),
-					StopAnalyzer.ENGLISH_STOP_WORDS_SET);
-					*/
-		}
-		@Override
-		public TokenStream reusableTokenStream(String fieldName, Reader reader) throws
-		IOException{
-			Tokenizer tokenizer = (Tokenizer)getPreviousTokenStream();
-			if (tokenizer == null) {
-				return tokenStream(fieldName, reader);
-			}
-			else
-				tokenizer.reset(reader);
-			return tokenizer;
-		}
-    	
-    }
 	/* (non-Javadoc)
 	 * @see gate.Resource#getParameterValue(java.lang.String)
 	 */
@@ -262,6 +220,7 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 		return luceneDoc;
 		
 	}
+	/*
 	public List<Fieldable> getGenericFields(Document doc) {
 		List<Fieldable> fields = new Vector<Fieldable>();
 		Set<Annotation> allannotations = doc.getAnnotations("Original markups");
@@ -304,10 +263,13 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 		return fields;
 		
 	}
+	*/
 	/* (non-Javadoc)
 	 * @see gate.Executable#execute()
 	 */
+	/*
 	@Override
+	/*
 	public void execute() throws ExecutionException {
 		
 		// TODO Auto-generated method stub
@@ -318,7 +280,7 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 		if (this.indexwriter == null) {
 			if (this.parameters.get("LUCENEVERSION") != null)
 				this.versionNumber = Version.valueOf((String)this.parameters.get("LUCENEVERSION"));
-			Analyzer analyzer = new MedicalRecordAnalyzer(this.versionNumber);
+			Analyzer analyzer = new SimpleAnalyzer(this.versionNumber);
 			SimpleFSDirectory directory;
 			try {
 				directory = new SimpleFSDirectory(new File((String)this.parameters.get(Constants.INDEX_LOCATIONS)));
@@ -352,37 +314,41 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 			}
 		}		
 	}
-
+*/
 	/* (non-Javadoc)
 	 * @see gate.Executable#interrupt()
 	 */
+	/*
 	@Override
 	public void interrupt() {
 		// TODO Auto-generated method stub
 		
 	}
-
+*/
 	/* (non-Javadoc)
 	 * @see gate.Executable#isInterrupted()
 	 */
+	/*
 	@Override
 	public boolean isInterrupted() {
 		// TODO Auto-generated method stub
 		return false;
 	}
-
+*/
 	/* (non-Javadoc)
 	 * @see gate.LanguageAnalyser#setDocument(gate.Document)
 	 */
+	/*
 	@Override
 	public void setDocument(Document document) {
 		// TODO Auto-generated method stub
 		this.parameters.put("document",document);
 	}
-
+*/
 	/* (non-Javadoc)
 	 * @see gate.LanguageAnalyser#getDocument()
 	 */
+	/*
 	@Override
 	public Document getDocument() {
 		// TODO Auto-generated method stub
@@ -393,6 +359,7 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 	/* (non-Javadoc)
 	 * @see gate.LanguageAnalyser#setCorpus(gate.Corpus)
 	 */
+	/*
 	@Override
 	public void setCorpus(Corpus corpus) {
 		// TODO Auto-generated method stub
@@ -402,11 +369,12 @@ public class LuceneIndexWriter implements LanguageAnalyser{
 	/* (non-Javadoc)
 	 * @see gate.LanguageAnalyser#getCorpus()
 	 */
+	/*
 	@Override
 	public Corpus getCorpus() {
 		// TODO Auto-generated method stub
 		return this.parameters.get("corpus") != null ?  (Corpus)this.parameters.get("corpus")
 				: null;
 	}
-
+*/
 }

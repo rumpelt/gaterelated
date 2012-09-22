@@ -19,6 +19,7 @@ import edu.stanford.nlp.process.Tokenizer;
  * TODO: extend LuceneTokenizer so that you can use this to do 
  * lucene indexing of ngrams using the stanford tokenizers.
  */
+
 public class NgramTokenizer extends LuceneTokenizer implements Tokenizer {
 	private Tokenizer basetokenizer;
 	private int maxngram;
@@ -58,6 +59,7 @@ public class NgramTokenizer extends LuceneTokenizer implements Tokenizer {
 	}
 
 	public NgramTokenizer(Tokenizer tokenizer, int ngram) {
+		super(null);
 		this.maxngram = ngram;
 		this.minngram = ngram;
 		this.curroffset = -1;
@@ -66,6 +68,7 @@ public class NgramTokenizer extends LuceneTokenizer implements Tokenizer {
 	}
 	
 	public NgramTokenizer(Tokenizer tokenizer, int maxngram, int minngram) {
+		super(null);
 		this.maxngram = maxngram;
 		this.minngram = minngram;
 		this.curroffset = -1;

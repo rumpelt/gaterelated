@@ -78,7 +78,7 @@ public class WekaInstances extends Instances {
 			int capacity) {
 		super(datasetName,attributes, capacity);
 		this.workingInstance = null;
-		this.sparseInstance = false;
+		this.sparseInstance = true;
 		// TODO Auto-generated constructor stub
 	}
 	
