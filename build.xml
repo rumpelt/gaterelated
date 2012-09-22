@@ -33,6 +33,10 @@
         <mkdir dir="${dist}/lib"/>
 	<jar jarfile="${dist}/lib/gaterelated.jar" basedir="${build}"  />
     </target>
+    <target name="clean-gaterelated">
+        <delete dir="${build}" excludes="yelpacad/**"/>
+        <delete file="${dist}/lib/gaterelated.jar"/>
+    </target>
     <target name="clean"  description="clean the project">
         <delete dir="${build}"/>
         <delete dir="${dist}"/>
